@@ -1,0 +1,53 @@
+-- Program
+entrypoints Program ;
+PDefs. Program ::= [Def] ; 
+terminator Def "" ;
+
+-- Comments
+comment "//" ;
+comment "#" ;
+comment "/*" "*/" ;
+
+-- Function
+DFunc. Def ::= Type Ident "(" [Arg] ")" Body ;
+separator Arg "," ; 
+FBody. Body ::= "{" [Stm] "}";
+EBody. Body ::= ";" ;
+terminator Stm "" ;
+
+TInt. Type ::= "int" ;
+TBool. Type ::= "bool" ;
+TChar. Type ::= "char" ;
+TDouble. Type ::= "double" ;
+TVoid. Type ::= "void" ;
+
+ADecl. Arg ::= Spec Type AId ;
+CSpec. Spec ::= "const" ;
+ESpec. Spec ::= "" ;
+SId. AId ::= Id ;
+EId. AId ::= "" ;
+VDecl. Id ::= Ident ;
+VInit. Id ::= Ident "=" Exp ;
+
+SExp. Stm ::= Exp ";" ;
+SDecl. Stm ::= Spec Type [Id] ";" ;
+separator nonempty Id "," ;
+SRet. Stm ::= "return" Exp ";" ;
+SBlock. Stm ::=  "{" [Stm] "}" ;
+-- m.fl.
+
+-- Exp
+EInt. Exp15 ::= Integer ;
+EDouble. Exp15 ::= Double ;
+EChar. Exp15 ::= Char ;
+EString. Exp15 ::= String ;-- multiple part? (concatenation)
+ELShift. Exp10 ::= Exp8 "<<" Exp9 ;
+ERShift. Exp10 ::= Exp8 ">>" Exp9 ;
+coercions Exp 15 ;
+
+-- QConst
+EConst. Exp15 ::= Const ;
+DConst. Def ::= Const ;
+TConst. Type ::= Const ;
+QConst. Const ::= [Ident];
+separator Ident "::" ; 

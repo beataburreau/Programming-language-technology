@@ -1,0 +1,11 @@
+-- Arithmetical expressions in LBNF
+-- Expressions comprise integer literals and the operators + - * /.
+
+
+EAdd. Program ::= Program "+" Exp1 ; 
+ESub. Program ::= Program "-" Exp1 ; 
+EMul. Exp1 ::= Exp1 "*" Exp2 ;
+EDiv. Exp1 ::= Exp1 "/" Exp2 ; 
+EInt. Exp2 ::= Integer ;
+
+coercions Program 2 ;
