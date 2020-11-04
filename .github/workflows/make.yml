@@ -6,19 +6,29 @@ on:
       - main
 
 jobs:
-  build:
+  lab1:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
       - uses: actions/setup-haskell@v1
+      
+      - name: Cache
+        uses: actions/cache@v1
+        env:
+          cache-name: cache-cabal
         with:
-          fetch-depth: 1
+          path: ~/.cabal
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/cabal.project') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
       - name: Install dependencies
         run: |
           cabal install happy
           cabal install alex
           cabal install BNFC
       - name: Run Build
-        run: make
+        run: cd "Lab 1" && make
       - name: Run Test
-        run: make test
+        run: cd "Lab 1" && make test
