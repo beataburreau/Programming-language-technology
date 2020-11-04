@@ -27,7 +27,7 @@ jobs:
         run: |
           cabal install happy
           cabal install alex
-          cabal install BNFC
+          cabal install bnfc
       - name: Run Build
         run: make -C "Lab 1" all
       - name: Run Test
