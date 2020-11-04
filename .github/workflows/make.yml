@@ -10,15 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
+      - uses: actions/setup-haskell@v1
         with:
           fetch-depth: 1
+      - name: Install dependencies
+        run: |
+          cabal install happy
+          cabal install alex
+          cabal install BNFC
       - name: Run Build
         run: make
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@master
-        with:
-          fetch-depth: 1
       - name: Run Test
         run: make test
