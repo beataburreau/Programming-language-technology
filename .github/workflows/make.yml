@@ -29,6 +29,6 @@ jobs:
           cabal install alex
           cabal install BNFC
       - name: Run Build
-        run: make -C "Lab 1" build
+        run: make -C "Lab 1" all
       - name: Run Test
         run: make -C "Lab 1" test
