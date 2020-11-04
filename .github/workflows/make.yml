@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@main
       - uses: actions/setup-haskell@v1
-      
+
       - name: Cache
         uses: actions/cache@v1
         env:
@@ -29,6 +29,6 @@ jobs:
           cabal install alex
           cabal install BNFC
       - name: Run Build
-        run: cd "Lab 1" && make
+        run: make -C "Lab 1"
       - name: Run Test
-        run: cd "Lab 1" && make test
+        run: make -C "Lab 1"
