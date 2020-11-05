@@ -40,14 +40,59 @@ SBlock. Stm ::=  "{" [Stm] "}" ;
 EInt. Exp15 ::= Integer ;
 EDouble. Exp15 ::= Double ;
 EChar. Exp15 ::= Char ;
-EString. Exp15 ::= String ;-- multiple part? (concatenation)
+EString. Exp15 ::= [String] ;
+separator nonempty String "";
+
+EIndex. Exp14 ::= Exp13 "[" Exp "]" ;
+
+EFuncCall. Exp14 ::= Exp13 "(" [Exp] ")" ;
+separator Exp "," ;
+
+EDotOp. Exp14 ::= Exp12 "." Exp13 ;
+EArrowOp. Exp14 ::= Exp12 "->" Exp13 ;
+
+ERIncr. Exp14 ::= Exp13 "++" ;
+ERDecr. Exp14 ::= Exp13 "--" ;
+
+ELIncr. Exp13 ::= "++" Exp12 ; 
+ELDecr. Exp13 ::= "--" Exp12 ; 
+EDeref. Exp13 ::= "*" Exp12 ;
+ENeg. Exp13 ::=  "!" Exp12 ;
+
+EMul. Exp12 ::= Exp10 "*" Exp11 ;
+EDiv. Exp12 ::= Exp10 "/" Exp11 ;
+ERem. Exp12 ::= Exp10 "%" Exp11 ;
+
+EAdd. Exp11 ::= Exp9 "+" Exp10 ;
+ESub. Exp11 ::= Exp9 "-" Exp10 ;
+
 ELShift. Exp10 ::= Exp8 "<<" Exp9 ;
 ERShift. Exp10 ::= Exp8 ">>" Exp9 ;
 coercions Exp 15 ;
 
+ELess. Exp9 ::= Exp7 "<" Exp8 ;
+EGreat. Exp9 ::= Exp7 ">" Exp8 ; 
+ELEq. Exp9 ::= Exp7 "<=" Exp8 ;
+EGEq. Exp9 ::= Exp7 ">=" Exp8 ;
+
+EEq. Exp8 ::= Exp6 "==" Exp7 ;
+EInEq. Exp8 ::= Exp6 "!=" Exp7 ;
+
+EConj. Exp4 ::= Exp2 "&&" Exp3 ;
+
+EDisj. Exp3 ::= Exp1 "||" Exp2 ; 
+
+EAss. Exp2 ::= Exp1 "=" Exp ;
+EIncrease. Exp2 ::= Exp1 "+=" Exp ;
+EDecrease. Exp2 ::= Exp1 "-=" Exp ;
+
+ECond. Exp2 ::= Exp1 "?" Exp1 ":" Exp ;
+
+EException. Exp1 ::= "throw" Exp ;
+
 -- QConst
 EConst. Exp15 ::= Const ;
-DConst. Def ::= Const ;
+--DConst. Def ::= Const ;
 TConst. Type ::= Const ;
 QConst. Const ::= [Ident];
-separator Ident "::" ; 
+separator nonempty Ident "::" ; 
