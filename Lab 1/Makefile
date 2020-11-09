@@ -13,7 +13,7 @@ BuildFiles: src/Lab.cf
 
 # Rules for running tests.
 test: build TestFiles
-	cd build && ./progs-test-lab1 ../src/Lab.cf
+	cd build && progs-test-lab1 ../src/Lab.cf
 
 TestFiles: BuildFiles test/Makefile
 	$(MAKE) -C test

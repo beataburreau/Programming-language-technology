@@ -43,57 +43,57 @@ EChar. Exp15 ::= Char ;
 EString. Exp15 ::= [String] ;
 separator nonempty String "";
 
-EIndex. Exp14 ::= Exp15 "[" Exp "]" ;
+EIndex. Exp14 ::= Exp14 "[" Exp "]" ;
 
-EFuncCall. Exp14 ::= Exp15 "(" [Exp] ")" ;
+EFuncCall. Exp14 ::= Exp14 "(" [Exp] ")" ;
 separator Exp "," ;
 
-EDotOp. Exp14 ::= Exp15 "." Exp16 ;
-EArrowOp. Exp14 ::= Exp15 "->" Exp16 ;
+EDotOp. Exp14 ::= Exp14 "." Exp15 ;
+EArrowOp. Exp14 ::= Exp14 "->" Exp15 ;
 
-ERIncr. Exp14 ::= Exp15 "++" ;
-ERDecr. Exp14 ::= Exp15 "--" ;
+ERIncr. Exp14 ::= Exp14 "++" ;
+ERDecr. Exp14 ::= Exp14 "--" ;
 
-ELIncr. Exp13 ::= "++" Exp14 ; 
-ELDecr. Exp13 ::= "--" Exp14 ; 
-EDeref. Exp13 ::= "*" Exp14 ;
-ENeg. Exp13 ::=  "!" Exp14 ;
+ELIncr. Exp13 ::= "++" Exp13 ; 
+ELDecr. Exp13 ::= "--" Exp13 ; 
+EDeref. Exp13 ::= "*" Exp13 ;
+ENeg. Exp13 ::=  "!" Exp13 ;
 
-EMul. Exp12 ::= Exp13 "*" Exp14 ;
-EDiv. Exp12 ::= Exp13 "/" Exp14 ;
-ERem. Exp12 ::= Exp13 "%" Exp14 ;
+EMul. Exp12 ::= Exp12 "*" Exp13 ;
+EDiv. Exp12 ::= Exp12 "/" Exp13 ;
+ERem. Exp12 ::= Exp12 "%" Exp13 ;
 
-EAdd. Exp11 ::= Exp12 "+" Exp13 ;
-ESub. Exp11 ::= Exp12 "-" Exp13 ;
+EAdd. Exp11 ::= Exp11 "+" Exp12 ;
+ESub. Exp11 ::= Exp11 "-" Exp12 ;
 
-ELShift. Exp10 ::= Exp11 "<<" Exp12 ;
-ERShift. Exp10 ::= Exp11 ">>" Exp12 ;
+ELShift. Exp10 ::= Exp10 "<<" Exp11 ;
+ERShift. Exp10 ::= Exp10 ">>" Exp11 ;
 
-ELess. Exp9 ::= Exp10 "<" Exp11 ;
-EGreat. Exp9 ::= Exp10 ">" Exp11 ; 
-ELEq. Exp9 ::= Exp10 "<=" Exp11 ;
-EGEq. Exp9 ::= Exp10 ">=" Exp11 ;
+ELess. Exp9 ::= Exp9 "<" Exp10 ;
+EGreat. Exp9 ::= Exp9 ">" Exp10 ; 
+ELEq. Exp9 ::= Exp9 "<=" Exp10 ;
+EGEq. Exp9 ::= Exp9 ">=" Exp10 ;
 
-EEq. Exp8 ::= Exp9 "==" Exp10 ;
-EInEq. Exp8 ::= Exp9 "!=" Exp10 ;
+EEq. Exp8 ::= Exp8 "==" Exp9 ;
+EInEq. Exp8 ::= Exp8 "!=" Exp9 ;
 
-EConj. Exp4 ::= Exp5 "&&" Exp6 ;
+EConj. Exp4 ::= Exp4 "&&" Exp5 ;
 
-EDisj. Exp3 ::= Exp4 "||" Exp5 ; 
+EDisj. Exp3 ::= Exp3 "||" Exp4 ; 
 
-EAss. Exp2 ::= Exp4 "=" Exp3 ;
-EIncrease. Exp2 ::= Exp4 "+=" Exp3 ;
-EDecrease. Exp2 ::= Exp4 "-=" Exp3 ;
+EAss. Exp2 ::= Exp3 "=" Exp2 ;
+EIncrease. Exp2 ::= Exp3 "+=" Exp2 ;
+EDecrease. Exp2 ::= Exp3 "-=" Exp2 ;
 
-ECond. Exp2 ::= Exp4 "?" Exp4 ":" Exp3 ;
+ECond. Exp2 ::= Exp3 "?" Exp3 ":" Exp2 ;
 
-EException. Exp1 ::= "throw" Exp2 ;
+EException. Exp1 ::= "throw" Exp1 ;
 
-coercions Exp 16 ;
+coercions Exp 15 ;
 
 -- QConst
 EConst. Exp15 ::= Const ;
-DConst. Def ::= Const ;
+DConst. Def ::= "using" Const ";" ;
 TConst. Type ::= Const ;
 QConst. Const ::= [Ident];
 separator nonempty Ident "::" ; 
