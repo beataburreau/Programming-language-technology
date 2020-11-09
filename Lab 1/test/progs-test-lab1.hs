@@ -32,7 +32,7 @@ import System.IO.Unsafe
 
 -- | Default good tests if no tests (neither good nor bad) are given on command line.
 defaultGood :: [FilePath]
-defaultGood = ["../test/good", "../test/good-CMM"]
+defaultGood = ["../test/good"]
 
 -- | Default bad test if no tests (neither good nor bad) are given on command line.
 defaultBad :: [FilePath]
