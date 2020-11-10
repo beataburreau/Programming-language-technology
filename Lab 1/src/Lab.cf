@@ -8,39 +8,47 @@ comment "//" ;
 comment "#" ;
 comment "/*" "*/" ;
 
+-- Identifiers 
+token Id (letter (letter | digit | '_')*) ;
+
 -- Function
-DFunc. Def ::= Type Ident "(" [Arg] ")" Body ;
+DFunc. Def ::= Type Id "(" [Arg] ")" Body ;
 separator Arg "," ; 
+DTDef. Def ::= "typedef" Type Id ";";
+DConst. Def ::= "using" Const ";" ;
+DVDecl. Def ::= Decl ;
 FBody. Body ::= "{" [Stm] "}";
 EBody. Body ::= ";" ;
 terminator Stm "" ;
 
+-- Types
 TInt. Type ::= "int" ;
 TBool. Type ::= "bool" ;
 TChar. Type ::= "char" ;
 TDouble. Type ::= "double" ;
 TVoid. Type ::= "void" ;
 TConst. Type ::= Const ;
+TRef. Type ::= Type "& " ; 
 
--- QConst
+-- Qualified constants
 EConst. Exp15 ::= Const ;
-DConst. Def ::= "using" Const ";" ;
-QConst. Const ::= [Ident];
-separator nonempty Ident "::" ; 
+QConst. Const ::= [Id];
+separator nonempty Id "::" ; 
 
+-- Arguments
 ADecl. Arg ::= Type ;
-AIdDecl. Arg ::= Type Id ;
+AVarDecl. Arg ::= Type Var ;
 ASDecl. Arg ::= "const" Type ;
-ASIdDecl. Arg ::= "const" Type Id ;
-VDecl. Id ::= Ident ;
-VInit. Id ::= Ident "=" Exp ;
+ASVarDecl. Arg ::= "const" Type Var ;
+VDecl. Var ::= Id ;
+VInit. Var ::= Id "=" Exp ;
 
 -- Statements
 SExp. Stm ::= Exp ";" ;
 SDecl. Stm ::= Decl ;
-DDecl. Decl ::= Type [Id] ";" ;
-DSDecl. Decl ::= "const" Type [Id] ";" ;
-separator nonempty Id "," ;
+DDecl. Decl ::= Type [Var] ";" ;
+DSDecl. Decl ::= "const" Type [Var] ";" ;
+separator nonempty Var "," ;
 SRet. Stm ::= "return" Exp ";" ;
 SWhile. Stm ::= "while" "(" Exp ")" Stm ;
 SDo. Stm ::= "do" Stm "while" "(" Exp ")" ";" ; 
@@ -48,10 +56,9 @@ SFor. Stm ::= "for" "(" Decl Exp ";" Exp ")" Stm ;
 SIf. Stm ::= "if" "(" Exp ")" Stm ;
 SIfElse. Stm ::= "if" "(" Exp ")" Stm "else" Stm;
 SBlock. Stm ::= "{" [Stm] "}" ;
-STDef. Stm ::= "typedef" Type Ident ";";
--- m.fl.
+STDef. Stm ::= "typedef" Type Id ";";
 
--- Exp
+-- Expressions
 EInt. Exp15 ::= Integer ;
 EDouble. Exp15 ::= Double ;
 EChar. Exp15 ::= Char ;
