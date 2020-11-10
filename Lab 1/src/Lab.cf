@@ -20,20 +20,35 @@ TBool. Type ::= "bool" ;
 TChar. Type ::= "char" ;
 TDouble. Type ::= "double" ;
 TVoid. Type ::= "void" ;
+TConst. Type ::= Const ;
 
-ADecl. Arg ::= Spec Type AId ;
-CSpec. Spec ::= "const" ;
-ESpec. Spec ::= "" ;
-SId. AId ::= Id ;
-EId. AId ::= "" ;
+-- QConst
+EConst. Exp15 ::= Const ;
+DConst. Def ::= "using" Const ";" ;
+QConst. Const ::= [Ident];
+separator nonempty Ident "::" ; 
+
+ADecl. Arg ::= Type ;
+AIdDecl. Arg ::= Type Id ;
+ASDecl. Arg ::= "const" Type ;
+ASIdDecl. Arg ::= "const" Type Id ;
 VDecl. Id ::= Ident ;
 VInit. Id ::= Ident "=" Exp ;
 
+-- Statements
 SExp. Stm ::= Exp ";" ;
-SDecl. Stm ::= Spec Type [Id] ";" ;
+SDecl. Stm ::= Decl ;
+DDecl. Decl ::= Type [Id] ";" ;
+DSDecl. Decl ::= "const" Type [Id] ";" ;
 separator nonempty Id "," ;
 SRet. Stm ::= "return" Exp ";" ;
-SBlock. Stm ::=  "{" [Stm] "}" ;
+SWhile. Stm ::= "while" "(" Exp ")" Stm ;
+SDo. Stm ::= "do" Stm "while" "(" Exp ")" ";" ; 
+SFor. Stm ::= "for" "(" Decl Exp ";" Exp ")" Stm ; 
+SIf. Stm ::= "if" "(" Exp ")" Stm ;
+SIfElse. Stm ::= "if" "(" Exp ")" Stm "else" Stm;
+SBlock. Stm ::= "{" [Stm] "}" ;
+STDef. Stm ::= "typedef" Type Ident ";";
 -- m.fl.
 
 -- Exp
@@ -90,10 +105,3 @@ ECond. Exp2 ::= Exp3 "?" Exp3 ":" Exp2 ;
 EException. Exp1 ::= "throw" Exp1 ;
 
 coercions Exp 15 ;
-
--- QConst
-EConst. Exp15 ::= Const ;
-DConst. Def ::= "using" Const ";" ;
-TConst. Type ::= Const ;
-QConst. Const ::= [Ident];
-separator nonempty Ident "::" ; 
