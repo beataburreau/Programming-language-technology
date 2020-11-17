@@ -15,17 +15,17 @@ jobs:
           ghc-version: '8.8.2'
           cabal-version: '3.0'
 
-#      - name: Cache
-#        uses: actions/cache@v1
-#        env:
-#          cache-name: cache-cabal
-#        with:
-#          path: ~/.cabal
-#          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/cabal.project') }}
-#          restore-keys: |
-#            ${{ runner.os }}-build-${{ env.cache-name }}-
-#            ${{ runner.os }}-build-
-#            ${{ runner.os }}-
+      - name: Cache
+        uses: actions/cache@v1
+        env:
+          cache-name: cache-cabal
+        with:
+          path: ~/.cabal
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/cabal.project') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
       - name: Install dependencies
         run: |
           cabal install happy
@@ -33,3 +33,30 @@ jobs:
           cabal install BNFC
       - name: Build and Test
         run: make -C "Lab 1" test
+lab2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - uses: actions/setup-haskell@v1 
+        with:
+          ghc-version: '8.8.2'
+          cabal-version: '3.0'
+
+      - name: Cache
+        uses: actions/cache@v1
+        env:
+          cache-name: cache-cabal
+        with:
+          path: ~/.cabal
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/cabal.project') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+      - name: Install dependencies
+        run: |
+          cabal install happy
+          cabal install alex
+          cabal install BNFC
+      - name: Build and Test
+        run: make -C lab2 test
