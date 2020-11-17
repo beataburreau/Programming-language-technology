@@ -33,7 +33,7 @@ jobs:
           cabal install BNFC
       - name: Build and Test
         run: make -C "Lab 1" test
-lab2:
+  lab2:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
