@@ -11,9 +11,17 @@ build: BuildFiles
 BuildFiles: src/Lab.cf
 	bnfc -m src/Lab.cf -o ./build
 
+# Windows and UNIX compability
+ifeq ($(OS),Windows_NT)
+    dotslash := 
+else
+    dotslash := ./
+endif
+
 # Rules for running tests.
 test: build TestFiles
-	cd build && ./progs-test-lab1 ../src/Lab.cf
+		cd build && $(dotslash)progs-test-lab1 ../src/Lab.cf
+
 
 TestFiles: BuildFiles test/Makefile
 	$(MAKE) -C test
