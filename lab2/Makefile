@@ -6,16 +6,27 @@
 # Files of solution.  Add more files as needed.  'lab2.hs'  has to be first!
 files=lab2.hs CMM.cf Makefile TypeChecker.hs Interpreter.hs
 
+# Windows and UNIX compability
+ifeq ($(OS),Windows_NT)
+    dotslash := 
+else
+    dotslash := ./
+endif
 ###########################################################################
 
 # List of goals not corresponding to file names.
-.PHONY : sdist clean distclean
+.PHONY : sdist clean distclean test
 
 # 'lab2' is default goal and needs to remain first goal in this file!
 # The extra dependency CMM/Test ensures that the parser is built from CMM.cf
 
 lab2 : $(files) CMM/Test
 	ghc --make lab2.hs -o lab2
+
+# running the tests
+test : lab2
+	$(MAKE) -C test
+	cd test && $(dotslash)progs-test-lab2 ../
 
 # Rules to build the parser:
 

@@ -13,7 +13,7 @@ import qualified GHC.Exts as Happy_GHC_Exts
 import Control.Applicative(Applicative(..))
 import Control.Monad (ap)
 
--- parser produced by Happy Version 1.19.12
+-- parser produced by Happy Version 1.20.0
 
 newtype HappyAbsSyn  = HappyAbsSyn HappyAny
 #if __GLASGOW_HASKELL__ >= 607
@@ -211,14 +211,14 @@ happyExpList = HappyA# "\x00\x00\x00\x00\x00\x00\x00\x00\x18\x09\x00\x00\x00\x00
 happyExpListPerState st =
     token_strs_expected
   where token_strs = ["error","%dummy","%start_pProgram","%start_pDef","%start_pListDef","%start_pArg","%start_pListArg","%start_pStm","%start_pListStm","%start_pExp6","%start_pExp5","%start_pExp4","%start_pExp3","%start_pExp2","%start_pExp1","%start_pExp","%start_pListExp","%start_pIncDecOp","%start_pMulOp","%start_pAddOp","%start_pCmpOp","%start_pBoolLit","%start_pType","%start_pListId","Integer","Double","Id","Program","Def","ListDef","Arg","ListArg","Stm","ListStm","Exp6","Exp5","Exp4","Exp3","Exp2","Exp1","Exp","ListExp","IncDecOp","MulOp","AddOp","CmpOp","BoolLit","Type","ListId","'!='","'&&'","'('","')'","'*'","'+'","'++'","','","'-'","'--'","'/'","';'","'<'","'<='","'='","'=='","'>'","'>='","'bool'","'double'","'else'","'false'","'if'","'int'","'return'","'true'","'void'","'while'","'{'","'||'","'}'","L_integ","L_doubl","L_Id","%eof"]
-        bit_start = st * 84
-        bit_end = (st + 1) * 84
+        bit_start = st Prelude.* 84
+        bit_end = (st Prelude.+ 1) Prelude.* 84
         read_bit = readArrayBit happyExpList
-        bits = map read_bit [bit_start..bit_end - 1]
-        bits_indexed = zip bits [0..83]
-        token_strs_expected = concatMap f bits_indexed
-        f (False, _) = []
-        f (True, nr) = [token_strs !! nr]
+        bits = Prelude.map read_bit [bit_start..bit_end Prelude.- 1]
+        bits_indexed = Prelude.zip bits [0..83]
+        token_strs_expected = Prelude.concatMap f bits_indexed
+        f (Prelude.False, _) = []
+        f (Prelude.True, nr) = [token_strs Prelude.!! nr]
 
 happyActOffsets :: HappyAddr
 happyActOffsets = HappyA# "\xf4\xff\xf4\xff\xf4\xff\xf4\xff\xf4\xff\x03\x00\x03\x00\x23\x00\x23\x00\x23\x00\x23\x00\x23\x00\x23\x00\x23\x00\x23\x00\x89\x00\x2f\x00\x0d\x01\x11\x02\xfa\xff\xf4\xff\xe0\xff\xe4\xff\x00\x00\x0a\x00\x1e\x00\x00\x00\x1e\x00\x00\x00\x00\x00\x00\x00\x00\x00\x1e\x00\x00\x00\x00\x00\x1e\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x1e\x00\x00\x00\x00\x00\x1e\x00\x00\x00\x00\x00\x1e\x00\x00\x00\x00\x00\x00\x00\x00\x00\x1d\x02\x00\x00\x2f\x00\x08\x02\x00\x00\x34\x00\x31\x00\x50\x00\x3f\x00\x53\x00\x00\x00\x23\x00\x00\x00\x59\x00\x2e\x00\x14\x00\xff\xff\x59\x00\x05\x00\xfe\xff\x59\x00\x03\x00\x59\x00\x7c\x00\x6f\x00\x98\x00\x23\x00\x9f\x00\x03\x00\x80\x00\x9c\x00\x83\x00\x8c\x00\x92\x00\xf4\xff\x92\x00\x94\x00\x96\x00\x96\x00\x00\x00\xb4\x00\x00\x00\x00\x00\xf4\xff\xa2\x00\x23\x00\xbc\x00\x23\x00\x24\x00\xbd\x00\x00\x00\x00\x00\x23\x00\x23\x00\x23\x00\x23\x00\x00\x00\x23\x00\xc6\x00\x00\x00\x23\x00\x23\x00\x23\x00\xaa\x00\x00\x00\x00\x00\x0d\x01\x00\x00\x00\x00\xd0\x00\xd9\x00\x00\x00\x2f\x00\x00\x00\x00\x00\x23\x00\xd8\x00\x00\x00\xdb\x00\x00\x00\x00\x00\xf4\xff\xeb\x00\x03\x00\x03\x00\xe1\x00\x00\x00\x00\x00\xdd\x00\x00\x00\xe3\x00\x03\x00\x03\x00\x00\x00\xe6\x00\x00\x00\x00\x00"#
@@ -304,8 +304,8 @@ happyReduceArr = Happy_Data_Array.array (22, 84) [
 	(84 , happyReduce_84)
 	]
 
-happy_n_terms = 36 :: Int
-happy_n_nonterms = 25 :: Int
+happy_n_terms = 36 :: Prelude.Int
+happy_n_nonterms = 25 :: Prelude.Int
 
 happyReduce_22 = happySpecReduce_1  0# happyReduction_22
 happyReduction_22 happy_x_1
@@ -863,7 +863,7 @@ happyReturn = (return)
 happyThen1 m k tks = ((>>=)) m (\a -> k a tks)
 happyReturn1 :: () => a -> b -> Either String a
 happyReturn1 = \a tks -> (return) a
-happyError' :: () => ([(Token)], [String]) -> Either String a
+happyError' :: () => ([(Token)], [Prelude.String]) -> Either String a
 happyError' = (\(tokens, _) -> happyError tokens)
 pProgram tks = happySomeParser where
  happySomeParser = happyThen (happyParse 0# tks) (\x -> happyReturn (let {(HappyWrap28 x') = happyOut28 x} in x'))
@@ -960,9 +960,9 @@ myLexer = tokens
 
 -- Do not remove this comment. Required to fix CPP parsing when using GCC and a clang-compiled alex.
 #if __GLASGOW_HASKELL__ > 706
-#define LT(n,m) ((Happy_GHC_Exts.tagToEnum# (n Happy_GHC_Exts.<# m)) :: Bool)
-#define GTE(n,m) ((Happy_GHC_Exts.tagToEnum# (n Happy_GHC_Exts.>=# m)) :: Bool)
-#define EQ(n,m) ((Happy_GHC_Exts.tagToEnum# (n Happy_GHC_Exts.==# m)) :: Bool)
+#define LT(n,m) ((Happy_GHC_Exts.tagToEnum# (n Happy_GHC_Exts.<# m)) :: Prelude.Bool)
+#define GTE(n,m) ((Happy_GHC_Exts.tagToEnum# (n Happy_GHC_Exts.>=# m)) :: Prelude.Bool)
+#define EQ(n,m) ((Happy_GHC_Exts.tagToEnum# (n Happy_GHC_Exts.==# m)) :: Prelude.Bool)
 #else
 #define LT(n,m) (n Happy_GHC_Exts.<# m)
 #define GTE(n,m) (n Happy_GHC_Exts.>=# m)
@@ -1056,7 +1056,7 @@ happyDoAction i tk st
         = {- nothing -}
           case action of
                 0#           -> {- nothing -}
-                                     happyFail (happyExpListPerState ((Happy_GHC_Exts.I# (st)) :: Int)) i tk st
+                                     happyFail (happyExpListPerState ((Happy_GHC_Exts.I# (st)) :: Prelude.Int)) i tk st
                 -1#          -> {- nothing -}
                                      happyAccept i tk st
                 n | LT(n,(0# :: Happy_GHC_Exts.Int#)) -> {- nothing -}
@@ -1069,10 +1069,10 @@ happyDoAction i tk st
          off_i  = (off Happy_GHC_Exts.+# i)
          check  = if GTE(off_i,(0# :: Happy_GHC_Exts.Int#))
                   then EQ(indexShortOffAddr happyCheck off_i, i)
-                  else False
+                  else Prelude.False
          action
           | check     = indexShortOffAddr happyTable off_i
-          | otherwise = indexShortOffAddr happyDefActions st
+          | Prelude.otherwise = indexShortOffAddr happyDefActions st
 
 
 
@@ -1093,7 +1093,7 @@ happyLt x y = LT(x,y)
 
 
 readArrayBit arr bit =
-    Bits.testBit (Happy_GHC_Exts.I# (indexShortOffAddr arr ((unbox_int bit) `Happy_GHC_Exts.iShiftRA#` 4#))) (bit `mod` 16)
+    Bits.testBit (Happy_GHC_Exts.I# (indexShortOffAddr arr ((unbox_int bit) `Happy_GHC_Exts.iShiftRA#` 4#))) (bit `Prelude.mod` 16)
   where unbox_int (Happy_GHC_Exts.I# x) = x
 
 
@@ -1237,7 +1237,7 @@ happyFail explist i tk (action) sts stk =
 -- Internal happy errors:
 
 notHappyAtAll :: a
-notHappyAtAll = error "Internal Happy error\n"
+notHappyAtAll = Prelude.error "Internal Happy error\n"
 
 -----------------------------------------------------------------------------
 -- Hack to get the typechecker to accept our action functions
@@ -1255,7 +1255,7 @@ happyTcHack x y = y
 --      happySeq = happyDontSeq
 
 happyDoSeq, happyDontSeq :: a -> b -> b
-happyDoSeq   a b = a `seq` b
+happyDoSeq   a b = a `Prelude.seq` b
 happyDontSeq a b = b
 
 -----------------------------------------------------------------------------
