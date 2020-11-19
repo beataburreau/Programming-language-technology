@@ -32,6 +32,9 @@ EBool.     Exp6  ::= BoolLit ;
 EInt.      Exp6  ::= Integer ;
 EDouble.   Exp6  ::= Double  ;
 
+--- ### Conversion ????
+-- EConv. Exp ::= Typ "(" Exp ")" ;
+
 -- ### Identifiers and function calls.
 EId.       Exp6  ::= Id      ;
 EApp.      Exp6  ::= Id "(" [Exp] ")" ;  -- Restricted to Id.
