@@ -23,23 +23,61 @@ typecheck (PDefs defs) = do
 
 checkFun :: Env -> [Def] -> Err ()
 checkFun _ [] = Ok ()
-checkFun env ((DFun typ id args stmts):defs) = do
+checkFun env ((DFun fType id args stmts):defs) = do
   newEnv <- extendVar env args
-  case checkStmts newEnv stmts of
+  case checkStms fType newEnv stmts of
     Ok _ -> checkFun env defs
-    e -> e
+    Bad s -> Bad s
 
-checkStmts :: Env -> [Stm] -> Err ()
-checkStmts = undefined
+checkStms :: Type -> Env -> [Stm] -> Err Env
+checkStms fType = foldM (checkStm fType)
+
+-- foldM :: Monad m => (Env -> Stm -> Err Env) -> Env -> [Stm] -> Err Env
+
+checkStm :: Type -> Env -> Stm -> Err Env 
+checkStm fType env stm = case stm of
+  SExp exp -> do 
+    inferExp env exp 
+    return env
+  SDecls _ [] -> Ok env 
+  SDecls varType (id:ids) -> do 
+    newEnv <- updateVar env id varType
+    checkStm fType newEnv (SDecls varType ids)
+  SInit varType id exp -> do 
+    expType <- inferExp env exp
+    if expType == varType
+      then
+        checkStm fType env (SDecls varType [id])
+      else
+        Bad "Wrong type in variable initialization"
+  SReturn exp -> do
+    expType <- inferExp env exp
+    if expType == fType
+      then
+        Ok env
+      else
+        Bad "Wrong return type in function"
+  SWhile exp stm -> do 
+    checkExp env exp Type_bool
+    checkStm fType env stm
+  SBlock stms -> checkStms Type_void (newBlock env) stms
+  SIfElse exp stm1 stm2 -> do
+    cond <- inferExp env exp
+    case cond of
+      Type_bool -> checkStms fType env [SBlock [stm1], SBlock [stm2]]
+      _ -> Bad "Condition not of type Bool"
 
 extendVar :: Env -> [Arg] -> Err Env
-extendVar = undefined
+extendVar env [] = Ok env
+extendVar env ((ADecl typ id):args) = case updateVar env id typ of
+  Ok newenv -> extendVar newenv args
+  e -> e
 
 extendFun :: Env -> [Def] -> Err Env
 extendFun env [] = Ok env
 extendFun env ((DFun typ id args _):defs) = case updateFun env id (map getArgType args, typ) of
-    Ok extenv -> extendFun extenv defs
-    e -> e
+  Ok extenv -> extendFun extenv defs
+  e -> e
 
 getArgType :: Arg -> Type
 getArgType (ADecl typ _) = typ 
