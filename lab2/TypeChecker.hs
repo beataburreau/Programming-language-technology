@@ -2,42 +2,77 @@ module TypeChecker where
 
 import Control.Monad
 
-import Data.Map (Map)
 import Data.Either
-import qualified Data.Map as Map
+
+import Data.Bifunctor
 
 import CMM.Abs
+
 import CMM.Print
 import CMM.ErrM
 
-type Env = [[(String,Type)]]
+type Env = (Sig,[Context])
+type Sig = [(Id, ([Type], Type))]
+type Context = [(Id, Type)]
 
 -- check a whole program
 typecheck :: Program -> Err ()
-typecheck p = return ()
+typecheck (PDefs defs) = do
+    env <- extendFun emptyEnv defs
+    checkFun env defs
+
+checkFun :: Env -> [Def] -> Err ()
+checkFun _ [] = Ok ()
+checkFun env ((DFun typ id args stmts):defs) = do
+  newEnv <- extendVar env args
+  case checkStmts newEnv stmts of
+    Ok _ -> checkFun env defs
+    e -> e
+
+checkStmts :: Env -> [Stm] -> Err ()
+checkStmts = undefined
+
+extendVar :: Env -> [Arg] -> Err Env
+extendVar = undefined
+
+extendFun :: Env -> [Def] -> Err Env
+extendFun env [] = Ok env
+extendFun env ((DFun typ id args _):defs) = case updateFun env id (map getArgType args, typ) of
+    Ok extenv -> extendFun extenv defs
+    e -> e
+
+getArgType :: Arg -> Type
+getArgType (ADecl typ _) = typ 
 
 lookupVar :: Env -> Id -> Err Type
-lookupVar = undefined
+lookupVar (_, []) _ = Bad "Variable not declared"
+lookupVar (sig, block:blocks) id = case lookup id block of
+  Just varType -> Ok varType
+  Nothing -> lookupVar (sig, blocks) id
 
 lookupFun :: Env -> Id -> Err ([Type],Type)
-lookupFun = undefined
+lookupFun (sig, _) id = case lookup id sig of
+  Just funType -> Ok funType
+  Nothing -> Bad ("Undefined function :" ++ show id)
 
 updateVar :: Env -> Id -> Type -> Err Env
-updateVar (block:env) (Id id) typ = do
+updateVar (sig, block:blocks) id typ = do
   if elem id $ map fst block
     then
-      return Bad "Variable " ++ id ++ " already defined in block."
+      Bad ("Variable " ++ show id ++ " already defined in block.")
     else
-      return Ok env
+      Ok (sig, ((id, typ):block):blocks)
 
--- updateFun :: Env -> Id -> ([Type],Type) -> Err Env
-
+updateFun :: Env -> Id -> ([Type],Type) -> Err Env
+updateFun (sig, context) id funType = case lookup id sig of
+  Just _ -> Bad ("Function " ++ show id ++ " already declared")
+  Nothing -> Ok ((id, funType):sig, context)
 
 newBlock :: Env -> Env
-newBlock env = []:env
+newBlock (sig, blocks) = (sig, []:blocks)
 
-emptyEnv  :: Env
-emptyEnv = []
+emptyEnv :: Env
+emptyEnv = ([],[[]])
 
 inferExp :: Env -> Exp -> Err Type 
 inferExp env x = case x of
@@ -60,11 +95,9 @@ inferExp env x = case x of
         passedTypes <- mapRight (inferExp env) args
         if argTypes == passedTypes
           then
-            return returnType
-          else     
-            Bad ("wrong type of function. Expected " ++ argTypes ++ " but got " ++ passedTypes)
-
--- zipWith :: (a -> b -> c) -> [a] -> [b] -> [c]
+            Ok returnType
+          else
+            Bad ("wrong type of function. Expected " ++ show argTypes ++ " but got " ++ show passedTypes)
 
 inferBin :: [Type] -> Env -> Exp -> Exp -> Err Type 
 inferBin types env exp1 exp2 = do
@@ -76,4 +109,28 @@ inferBin types env exp1 exp2 = do
         Bad ("wrong type of expression " ++ printTree exp1)
 
 checkExp :: Env -> Exp -> Type -> Err Type
-checkExp = undefined
+checkExp env exp typ = do
+  t <- inferExp env exp 
+  if t == typ
+    then
+      Ok typ
+    else 
+      Bad ("wrong type of expression " ++ printTree exp ++" actual type: " ++ show t ++ "expected type: " ++ show typ)
+
+-- Help functions
+
+mapErr :: (a -> Err b) -> [a] -> Err ()
+mapErr f l = do 
+  if null (lefts (map f l))
+    then
+      Ok ()
+    else
+      Bad (head (lefts (map f l)))
+
+mapRight :: (a -> Err b) -> [a] -> Err [b]
+mapRight f l = do 
+  if null (lefts (map f l))
+    then
+      Ok (rights (map f l))
+    else
+      Bad (head (lefts (map f l)))
