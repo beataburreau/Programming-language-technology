@@ -109,8 +109,12 @@ updateFun (sig, context) id funType = case lookup id sig of
 newBlock :: Env -> Env
 newBlock (sig, blocks) = (sig, []:blocks)
 
+--    void   printInt(int x)        // print an integer and a newline in standard output
+--    void   printDouble(double x)  // print a double and a newline in standard output
+--    int    readInt()              // read an integer from standard input
+--    double readDouble()           // read a double from standard input
 emptyEnv :: Env
-emptyEnv = ([],[[]])
+emptyEnv = ([(Id "printInt", ([Type_int], Type_void)), (Id "printDouble", ([Type_double], Type_void)), (Id "readInt", ([], Type_int)), (Id "readDouble", ([], Type_double))],[[]])
 
 inferExp :: Env -> Exp -> Err Type 
 inferExp env x = case x of
