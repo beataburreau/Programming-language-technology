@@ -45,22 +45,24 @@ checkStm fType env stm = case stm of
     checkStm fType newEnv (SDecls varType ids)
   SInit varType id exp -> do 
     expType <- inferExp env exp
-    if expType == varType
+    if varType == maxType expType varType
       then
         checkStm fType env (SDecls varType [id])
       else
         Bad "Wrong type in variable initialization"
   SReturn exp -> do
     expType <- inferExp env exp
-    if expType == fType
+    if fType == maxType expType fType 
       then
         Ok env
       else
         Bad "Wrong return type in function"
   SWhile exp stm -> do 
     checkExp env exp Type_bool
-    checkStm fType env stm
-  SBlock stms -> checkStms Type_void (newBlock env) stms
+    checkStm fType env (SBlock [stm])
+  SBlock stms -> case checkStms fType (newBlock env) stms of
+    Ok _ -> return env
+    e -> e
   SIfElse exp stm1 stm2 -> do
     cond <- inferExp env exp
     case cond of
@@ -126,29 +128,44 @@ inferExp env x = case x of
     EMul exp1 _ exp2 -> inferBin [Type_int, Type_double] env exp1 exp2
     EPost id _ -> lookupVar env id
     EPre _ id -> lookupVar env id
-    ECmp exp1 _ exp2 -> inferBin [Type_int, Type_double] env exp1 exp2
+    ECmp exp1 _ exp2 -> case inferBin [Type_int, Type_double, Type_bool] env exp1 exp2 of
+      Ok _ -> return Type_bool
+      e -> e
     EAnd exp1 exp2 -> inferBin [Type_bool] env exp1 exp2
     EOr exp1 exp2 -> inferBin [Type_bool] env exp1 exp2
     EAss id exp -> case lookupVar env id of
-        Ok typ -> inferBin [typ] env exp exp
+        Ok typ -> inferBin (smallerTypes typ) env exp exp
         e -> e
     EApp id args -> do 
         (argTypes, returnType) <- lookupFun env id
         passedTypes <- mapRight (inferExp env) args
-        if argTypes == passedTypes
+        if all contains (zip passedTypes (map smallerTypes argTypes))
           then
             Ok returnType
           else
             Bad ("wrong type of function. Expected " ++ show argTypes ++ " but got " ++ show passedTypes)
 
+contains :: (Type, [Type]) -> Bool
+contains (a, b) = elem a b
+
+smallerTypes :: Type -> [Type]
+smallerTypes Type_double = [Type_int, Type_double]
+smallerTypes a = [a]
+
 inferBin :: [Type] -> Env -> Exp -> Exp -> Err Type 
 inferBin types env exp1 exp2 = do
-    typ <- inferExp env exp1 
-    if elem typ types
+    typ1 <- inferExp env exp1 
+    typ2 <- inferExp env exp2 
+    if elem typ1 types && elem typ2 types
       then
-        checkExp env exp2 typ
+        Ok (maxType typ1 typ2)
       else
         Bad ("wrong type of expression " ++ printTree exp1)
+
+maxType :: Type -> Type -> Type
+maxType Type_int Type_double = Type_double
+maxType Type_double Type_int = Type_double
+maxType a b | a == b = a 
 
 checkExp :: Env -> Exp -> Type -> Err Type
 checkExp env exp typ = do
@@ -157,7 +174,7 @@ checkExp env exp typ = do
     then
       Ok typ
     else 
-      Bad ("wrong type of expression " ++ printTree exp ++" actual type: " ++ show t ++ "expected type: " ++ show typ)
+      Bad ("wrong type of expression " ++ printTree exp ++" actual type: " ++ show t ++ " expected type: " ++ show typ)
 
 -- Help functions
 
