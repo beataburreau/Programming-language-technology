@@ -5,3 +5,4 @@ CMM
 *.exe
 *.progs-test-lab2
 lab2/lab2
+lab2/CMM/*
