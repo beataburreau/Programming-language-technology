@@ -116,7 +116,10 @@ newBlock (sig, blocks) = (sig, []:blocks)
 --    int    readInt()              // read an integer from standard input
 --    double readDouble()           // read a double from standard input
 emptyEnv :: Env
-emptyEnv = ([(Id "printInt", ([Type_int], Type_void)), (Id "printDouble", ([Type_double], Type_void)), (Id "readInt", ([], Type_int)), (Id "readDouble", ([], Type_double))],[[]])
+emptyEnv = (predefinedFunctions,[[]])
+
+predefinedFunctions :: Sig
+predefinedFunctions = [(Id "printInt", ([Type_int], Type_void)), (Id "printDouble", ([Type_double], Type_void)), (Id "readInt", ([], Type_int)), (Id "readDouble", ([], Type_double))]
 
 inferExp :: Env -> Exp -> Err Type 
 inferExp env x = case x of
