@@ -22,16 +22,34 @@ predefinedFunctions :: [Def]
 predefinedFunctions = [DFun Type_void (Id "printInt") [ADecl Type_int (Id "x")] [], DFun Type_void (Id "printDouble") [ADecl Type_double (Id "x")] [], 
                         DFun Type_int (Id "readInt") [] [], DFun Type_double (Id "readDouble") [] []]
 
+evalArgs :: [Arg] -> [Exp] -> [(Id, Val)]
+evalArgs = undefined
+
 eval  :: Exp   -> Env -> IO (Val, Env)
 eval (EBool b) env = return (VBool b, env)
 eval (EInt i) env = return (VInt i, env)
 eval (EDouble g) env = return (VDouble g, env)
 eval (EId id) env = return (lookupVal id env, env)
-eval (EApp id exps) env = undefined
-eval (EPost id op) (defs, block:vals) = return (val, (defs, ((id, incDecVal val op):block):vals))
-    where val = lookupVal id (defs, block:vals)
-eval (EPre op id) (defs, block:vals) = return (val, (defs, ((id, val):block):vals))
-    where val = incDecVal (lookupVal id (defs, block:vals)) op
+eval (EApp (Id id) [n]) env | id == "printInt" || id == "printDouble" = do
+    (str, env1) <- eval n env
+    print str
+    return (VBool LTrue, env1)
+eval (EApp (Id "readInt") []) env = do
+    input <- getLine
+    return (VInt (read input), env)
+eval (EApp (Id "readDouble") []) env = do
+    input <- getLine
+    return (VDouble (read input), env)
+eval (EApp id exps) (defs, vals) = do
+    r <- execs stms (defs, evalArgs args exps :vals)
+    case r of
+        Left val -> return (val, (defs, vals))
+        Right env -> return (VBool LTrue, env)
+    where DFun _ _ args stms = lookupFun id (defs, vals)
+eval (EPost id op) (defs, vals) = return (val, (defs, updateVal vals id (incDecVal val op)))
+    where val = lookupVal id (defs, vals)
+eval (EPre op id) (defs, vals) = return (val, (defs, updateVal vals id val))
+    where val = incDecVal (lookupVal id (defs, vals)) op
 eval (EMul exp1 op exp2) env = do
     (v1, e1) <- eval exp1 env
     (v2, e2) <- eval exp2 e1
@@ -63,8 +81,16 @@ eval (EOr exp1 exp2) env = do
     (v2, e2) <- eval exp2 e1
     return (vOr v1 v2, e2)
 eval (EAss id exp) env = do
-    (v1, (defs, block:vals)) <- eval exp env 
-    return (v1, (defs, ((id, v1):block):vals))
+    (v1, (defs, vals)) <- eval exp env 
+    return (v1, (defs, updateVal vals id v1))
+
+updateVal :: [[(Id, Val)]] -> Id -> Val -> [[(Id, Val)]]
+updateVal = updteVal [[]]
+
+updteVal :: [[(Id, Val)]] -> [[(Id, Val)]] -> Id -> Val -> [[(Id, Val)]]
+updteVal _ [] _ _ = undefined
+updteVal head (t:tail) id val | elem id (map fst t) = head ++ [map (\(i,v) -> if i == id then (i,val) else (i,v)) t] ++ tail 
+updteVal head (t:tail) id val = updteVal (head ++ [t]) tail id val
 
 toBoolLit :: Bool -> Val
 toBoolLit True = VBool LTrue
@@ -145,6 +171,7 @@ isFalse (VDouble 0.0) = True
 isFalse _ = False
 
 execs :: [Stm] -> Env -> IO (Either Val Env)
+execs [] env = do return (Right env) 
 execs (s:ss) (defs, vals) = do
     r <- exec s (defs, vals)
     case r of
@@ -159,8 +186,3 @@ lookupVal id (defs, block:vals) = case lookup id block of
 lookupFun :: Id -> Env -> Def
 lookupFun id ((DFun typ fId args stms):_, _) | id == fId = DFun typ fId args stms
 lookupFun id (_:defs, vals) = lookupFun id (defs, vals)
--- Env extend (Env γ, Ident x, Val v)
--- Env extend (Env γ, Def d)
--- Env newBlock (Env γ)
--- Env exitBlock (Env γ)
--- Env emptyEnv ()
