@@ -9,6 +9,12 @@ import CMM.Abs
 import CMM.Print
 import CMM.ErrM
 
+data Val = VBool BoolLit
+    | VInt Integer
+    | VDouble Double
+    deriving (Prelude.Eq, Prelude.Ord, Prelude.Show, Prelude.Read)
+
+
 type Env = ([Def], [[(Id, Val)]])
 
 interpret :: Program -> IO ()
