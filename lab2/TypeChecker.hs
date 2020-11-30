@@ -17,6 +17,8 @@ type Context = [(Id, Type)]
 
 -- check a whole program
 typecheck :: Program -> Err ()
+typecheck (PDefs []) = Bad "Empty program"
+typecheck (PDefs defs) | not (elem (Id "main") (map getFunId defs)) = Bad "Empty program"
 typecheck (PDefs defs) = do
     env <- extendFun emptyEnv defs
     checkFun env defs
@@ -32,8 +34,6 @@ checkFun env ((DFun fType id args stmts):defs) = do
 checkStms :: Type -> Env -> [Stm] -> Err Env
 checkStms fType = foldM (checkStm fType)
 
--- foldM :: Monad m => (Env -> Stm -> Err Env) -> Env -> [Stm] -> Err Env
-
 checkStm :: Type -> Env -> Stm -> Err Env 
 checkStm fType env stm = case stm of
   SExp exp -> do 
@@ -44,19 +44,16 @@ checkStm fType env stm = case stm of
     newEnv <- updateVar env id varType
     checkStm fType newEnv (SDecls varType ids)
   SInit varType id exp -> do 
-    expType <- inferExp env exp
-    if varType == maxType expType varType
-      then
-        checkStm fType env (SDecls varType [id])
-      else
-        Bad "Wrong type in variable initialization"
+    env1 <- checkStm fType env (SDecls varType [id])
+    expType <- inferExp env1 exp
+    case maxType expType varType of 
+      Ok typ | varType == typ -> Ok env1
+      _ -> Bad "Wrong type in variable initialization"
   SReturn exp -> do
     expType <- inferExp env exp
-    if fType == maxType expType fType 
-      then
-        Ok env
-      else
-        Bad "Wrong return type in function"
+    case maxType expType fType of
+      Ok typ | typ == fType -> Ok env
+      _ -> Bad "Wrong return type in function"
   SWhile exp stm -> do 
     checkExp env exp Type_bool
     checkStm fType env (SBlock [stm])
@@ -71,6 +68,7 @@ checkStm fType env stm = case stm of
 
 extendVar :: Env -> [Arg] -> Err Env
 extendVar env [] = Ok env
+extendVar _ ((ADecl Type_void _):_) = Bad "Argument can't be of type void"
 extendVar env ((ADecl typ id):args) = case updateVar env id typ of
   Ok newenv -> extendVar newenv args
   e -> e
@@ -96,6 +94,7 @@ lookupFun (sig, _) id = case lookup id sig of
   Nothing -> Bad ("Undefined function :" ++ show id)
 
 updateVar :: Env -> Id -> Type -> Err Env
+updateVar _ _ Type_void = Bad "Variable can't be of type void"
 updateVar (sig, block:blocks) id typ = do
   if elem id $ map fst block
     then
@@ -104,6 +103,7 @@ updateVar (sig, block:blocks) id typ = do
       Ok (sig, ((id, typ):block):blocks)
 
 updateFun :: Env -> Id -> ([Type],Type) -> Err Env
+updateFun (_, _) (Id "main") (args, ret) | not (null args) || ret /= Type_int = Bad "incorrect main function"
 updateFun (sig, context) id funType = case lookup id sig of
   Just _ -> Bad ("Function " ++ show id ++ " already declared")
   Nothing -> Ok ((id, funType):sig, context)
@@ -129,24 +129,32 @@ inferExp env x = case x of
     EId id -> lookupVar env id 
     EAdd exp1 _ exp2 -> inferBin [Type_int, Type_double] env exp1 exp2
     EMul exp1 _ exp2 -> inferBin [Type_int, Type_double] env exp1 exp2
-    EPost id _ -> lookupVar env id
-    EPre _ id -> lookupVar env id
-    ECmp exp1 _ exp2 -> case inferBin [Type_int, Type_double, Type_bool] env exp1 exp2 of
+    EPost id _ -> inferUn [Type_double, Type_int] env (EId id)
+    EPre _ id -> inferUn [Type_double, Type_int] env (EId id)
+    ECmp exp1 op exp2 | op == OEq || op == ONEq -> case inferBin [Type_int, Type_double] env exp1 exp2 of
+      Ok _ -> return Type_bool
+      _ -> case inferBin [ Type_bool] env exp1 exp2 of
+        Ok _ -> return Type_bool
+        e -> e
+    ECmp exp1 _ exp2 -> case inferBin [Type_int, Type_double] env exp1 exp2 of
       Ok _ -> return Type_bool
       e -> e
     EAnd exp1 exp2 -> inferBin [Type_bool] env exp1 exp2
     EOr exp1 exp2 -> inferBin [Type_bool] env exp1 exp2
     EAss id exp -> case lookupVar env id of
-        Ok typ -> inferBin (smallerTypes typ) env exp exp
+        Ok typ -> inferUn (smallerTypes typ) env exp
         e -> e
     EApp id args -> do 
         (argTypes, returnType) <- lookupFun env id
         passedTypes <- mapRight (inferExp env) args
-        if all contains (zip passedTypes (map smallerTypes argTypes))
-          then
-            Ok returnType
+        if length argTypes /= length args 
+          then Bad "Incorrect number of function arguments"
           else
-            Bad ("wrong type of function. Expected " ++ show argTypes ++ " but got " ++ show passedTypes)
+            if all contains (zip passedTypes (map smallerTypes argTypes))
+              then
+                Ok returnType
+              else
+                Bad ("wrong type of function. Expected " ++ show argTypes ++ " but got " ++ show passedTypes)
 
 contains :: (Type, [Type]) -> Bool
 contains (a, b) = elem a b
@@ -155,20 +163,28 @@ smallerTypes :: Type -> [Type]
 smallerTypes Type_double = [Type_int, Type_double]
 smallerTypes a = [a]
 
+inferUn :: [Type] -> Env -> Exp -> Err Type 
+inferUn types env exp = do
+    typ <- inferExp env exp
+    if elem typ types
+      then
+        Ok typ
+      else
+        Bad ("wrong type of expression " ++ printTree exp)
+
 inferBin :: [Type] -> Env -> Exp -> Exp -> Err Type 
 inferBin types env exp1 exp2 = do
     typ1 <- inferExp env exp1 
     typ2 <- inferExp env exp2 
-    if elem typ1 types && elem typ2 types
-      then
-        Ok (maxType typ1 typ2)
-      else
-        Bad ("wrong type of expression " ++ printTree exp1)
+    case maxType typ1 typ2 of 
+      Ok typ | elem typ1 types && elem typ2 types -> Ok typ
+      _ -> Bad ("wrong type of expression " ++ printTree exp1)
 
-maxType :: Type -> Type -> Type
-maxType Type_int Type_double = Type_double
-maxType Type_double Type_int = Type_double
-maxType a b | a == b = a 
+maxType :: Type -> Type -> Err Type
+maxType Type_int Type_double = Ok Type_double
+maxType Type_double Type_int = Ok Type_double
+maxType a b | a == b = Ok a 
+maxType _ _ = Bad "Incompatible types"
 
 checkExp :: Env -> Exp -> Type -> Err Type
 checkExp env exp typ = do
@@ -180,6 +196,9 @@ checkExp env exp typ = do
       Bad ("wrong type of expression " ++ printTree exp ++" actual type: " ++ show t ++ " expected type: " ++ show typ)
 
 -- Help functions
+
+getFunId :: Def -> Id
+getFunId (DFun _ id _ _) = id
 
 mapErr :: (a -> Err b) -> [a] -> Err ()
 mapErr f l = do 

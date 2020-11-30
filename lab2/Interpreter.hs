@@ -50,7 +50,7 @@ eval (EInt i) env = return (VInt i, env)
 eval (EDouble g) env = return (VDouble g, env)
 eval (EId id) env = case lookupVal id env of
     Just v -> return (v, env)
-    Nothing -> ioError (userError ("Variable " ++ show id ++ " not assigned"))
+    Nothing -> ioError (userError ("Variable " ++ show id ++ " not initialized"))
 eval (EApp (Id id) [n]) env | id == "printInt" = do
     (str, env1) <- eval n env
     print str
@@ -74,8 +74,10 @@ eval (EApp id exps) (defs, vals) = do
     where DFun typ _ args stms = lookupFun id (defs, vals)
 eval (EPost id op) (defs, vals) = case lookupVal id (defs, vals) of
     Just val -> return (val, (defs, updateVal vals id (incDecVal val op)))
+    Nothing -> ioError (userError ("Variable " ++ show id ++ " not initialized"))
 eval (EPre op id) (defs, vals) = case lookupVal id (defs, vals) of
     Just val -> return (incDecVal val op, (defs, updateVal vals id (incDecVal val op)))
+    Nothing -> ioError (userError ("Variable " ++ show id ++ " not initialized"))
 eval (EMul exp1 op exp2) env = do
     (v1, e1) <- eval exp1 env
     (v2, e2) <- eval exp2 e1
@@ -246,6 +248,7 @@ lookupType id (defs, block:vals) = case lookup id block of
     Nothing -> lookupType id (defs, vals) 
 
 lookupVal :: Id -> Env -> Maybe Val
+lookupVal _ (_, []) = Nothing
 lookupVal id (defs, block:vals) = case lookup id block of
     Just v -> v
     Nothing -> lookupVal id (defs, vals)
