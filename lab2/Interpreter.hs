@@ -2,6 +2,8 @@ module Interpreter where
 
 import Control.Monad
 
+import System.IO.Error
+
 import Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -19,7 +21,7 @@ instance Show Val where
     show (VInt a) = show a
     show (VDouble a) = show a
 
-type Env = ([Def], [[(Id, Val)]])
+type Env = ([Def], [[(Id, Maybe Val)]])
 
 interpret :: Program -> IO ()
 interpret (PDefs p) = do
@@ -32,8 +34,8 @@ predefinedFunctions :: [Def]
 predefinedFunctions = [DFun Type_void (Id "printInt") [ADecl Type_int (Id "x")] [], DFun Type_void (Id "printDouble") [ADecl Type_double (Id "x")] [], 
                         DFun Type_int (Id "readInt") [] [], DFun Type_double (Id "readDouble") [] []]
 
-evalArgs :: ([(Id, Val)], Env) -> [Arg] -> [Exp] -> IO ([(Id, Val)], Env)
-evalArgs (vals, env) [] [] = return (vals, env)
+evalArgs :: ([(Id, Val)], Env) -> [Arg] -> [Exp] -> IO ([(Id, Maybe Val)], Env)
+evalArgs (vals, env) [] [] = return (map (\(id, val) -> (id, Just val)) vals, env)
 evalArgs (vals, env) ((ADecl typ id):as) (e:es) = do 
     (v, env2) <- eval e env 
     if typ == Type_double
@@ -46,7 +48,9 @@ eval  :: Exp   -> Env -> IO (Val, Env)
 eval (EBool b) env = return (VBool b, env)
 eval (EInt i) env = return (VInt i, env)
 eval (EDouble g) env = return (VDouble g, env)
-eval (EId id) env = return (lookupVal id env, env)
+eval (EId id) env = case lookupVal id env of
+    Just v -> return (v, env)
+    Nothing -> ioError (userError ("Variable " ++ show id ++ " not assigned"))
 eval (EApp (Id id) [n]) env | id == "printInt" = do
     (str, env1) <- eval n env
     print str
@@ -68,10 +72,10 @@ eval (EApp id exps) (defs, vals) = do
         Left val -> if typ == Type_double then return (toDouble val, env) else return (val, env)
         Right _ -> return (VBool LTrue, env)
     where DFun typ _ args stms = lookupFun id (defs, vals)
-eval (EPost id op) (defs, vals) = return (val, (defs, updateVal vals id (incDecVal val op)))
-    where val = lookupVal id (defs, vals)
-eval (EPre op id) (defs, vals) = return (val, (defs, updateVal vals id val))
-    where val = incDecVal (lookupVal id (defs, vals)) op
+eval (EPost id op) (defs, vals) = case lookupVal id (defs, vals) of
+    Just val -> return (val, (defs, updateVal vals id (incDecVal val op)))
+eval (EPre op id) (defs, vals) = case lookupVal id (defs, vals) of
+    Just val -> return (incDecVal val op, (defs, updateVal vals id (incDecVal val op)))
 eval (EMul exp1 op exp2) env = do
     (v1, e1) <- eval exp1 env
     (v2, e2) <- eval exp2 e1
@@ -128,11 +132,11 @@ compOp OGtEq a b = a >= b
 compOp OEq a b = a == b
 compOp ONEq a b = a /= b
 
-updateVal :: [[(Id, Val)]] -> Id -> Val -> [[(Id, Val)]]
+updateVal :: [[(Id, Maybe Val)]] -> Id -> Val -> [[(Id, Maybe Val)]]
 updateVal env1 id val = env2
-    where (_:env2) = updteVal [[]] env1 id val
+    where (_:env2) = updteVal [[]] env1 id (Just val)
 
-updteVal :: [[(Id, Val)]] -> [[(Id, Val)]] -> Id -> Val -> [[(Id, Val)]]
+updteVal :: [[(Id, Maybe Val)]] -> [[(Id, Maybe Val)]] -> Id -> Maybe Val -> [[(Id, Maybe Val)]]
 updteVal _ [] _ _ = undefined
 updteVal head (t:tail) id val | elem id (map fst t) = head ++ [map (\(i,v) -> if i == id then (i,val) else (i,v)) t] ++ tail 
 updteVal head (t:tail) id val = updteVal (head ++ [t]) tail id val
@@ -188,14 +192,14 @@ exec (SExp exp) env = do
     return (Right e)
 exec (SDecls typ ids) (defs, block:vals) = do
     return (Right (defs, (vars ++ block):vals))
-    where vars = zip ids (repeat (initVal typ))
+    where vars = zip ids (repeat Nothing)
 exec (SInit typ id exp) (defs, vals) = do
     (v, (defs1, block:vals1)) <- eval exp (defs, vals)
     if typ == Type_double
         then 
-            return (Right (defs1, ((id, toDouble v):block):vals1))
+            return (Right (defs1, ((id, Just (toDouble v)):block):vals1))
         else
-            return (Right (defs1, ((id, v):block):vals1))
+            return (Right (defs1, ((id, Just v):block):vals1))
 exec (SReturn exp) env = do
     (v, _) <- eval exp env
     return (Left v)
@@ -216,11 +220,6 @@ exec (SIfElse exp stm1 stm2) env = do
         else
             execs [SBlock [stm2]] env1
 
-initVal :: Type -> Val
-initVal Type_bool = VBool LFalse
-initVal Type_int = VInt 0
-initVal Type_double = VDouble 0.0
-
 isTrue :: Val -> Bool
 isTrue a = not (isFalse a)
 
@@ -240,12 +239,13 @@ execs (s:ss) (defs, vals) = do
 
 lookupType :: Id -> Env -> Type
 lookupType id (defs, block:vals) = case lookup id block of
-    Just (VDouble _) -> Type_double
-    Just (VInt _) -> Type_int
-    Just (VBool _) -> Type_bool
+    Just (Just (VDouble _)) -> Type_double
+    Just (Just (VInt _)) -> Type_int
+    Just (Just (VBool _)) -> Type_bool
+    Just Nothing -> Type_void
     Nothing -> lookupType id (defs, vals) 
 
-lookupVal :: Id -> Env -> Val
+lookupVal :: Id -> Env -> Maybe Val
 lookupVal id (defs, block:vals) = case lookup id block of
     Just v -> v
     Nothing -> lookupVal id (defs, vals)
