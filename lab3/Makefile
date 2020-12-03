@@ -10,16 +10,20 @@ files=lab3.hs jasmin.jar Runtime.java Makefile CMM.cf \
 ###########################################################################
 
 # List of goals not corresponding to file names.
-.PHONY : default all sdist clean distclean
+.PHONY : default build sdist clean distclean
 
 # lab3 must be first goal!
 default : lab3
 
-all : lab3 Runtime.class
+build : lab3 Runtime.class
+
+test : build
+	$(MAKE) -C test
+	test/progs-test-lab3 .
 
 # The extra dependency CMM/Test ensures that the parser is built from CMM.cf
 lab3 : $(files) CMM/Test
-	ghc --make lab3.hs -o lab3
+	ghc --make lab3.hs -o lab3 -package mtl
 
 # Rules to build the parser:
 

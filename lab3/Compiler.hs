@@ -9,9 +9,9 @@
 module Compiler where
 
 import Control.Monad
-import Control.Monad.Reader
-import Control.Monad.State
-import Control.Monad.RWS
+--import Control.Monad.Reader
+--import Control.Monad.State
+--import Control.Monad.RWS
 
 import Data.Maybe
 import Data.Map (Map)
