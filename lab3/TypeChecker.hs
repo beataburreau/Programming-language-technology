@@ -65,12 +65,12 @@ checkStm fType (env, aStms) stm = case stm of
     checkStm fType (newEnv, aStms ++ [stm]) (SDecls varType ids)
   SInit varType id exp -> do 
     (newEnv, newAStms) <- checkStm fType (env, aStms) (SDecls varType [id])
-    expType <- inferExp newEnv exp
-    cExp <- convertExpression varType expType exp
+    (typ, newExp) <- inferExp newEnv exp
+    cExp <- convertExpression varType typ newExp
     Ok (newEnv, newAStms ++ [SInit varType id (double cExp)])
   SReturn exp -> do
-    expType <- inferExp env exp
-    cExp <- convertExpression fType expType exp
+    (typ, newExp) <- inferExp env exp
+    cExp <- convertExpression fType typ newExp
     Ok (env, aStms ++ [SReturn (double cExp)])
   SWhile exp block -> do
     checkExp env exp Type_bool
@@ -85,13 +85,15 @@ checkStm fType (env, aStms) stm = case stm of
     (_, block2) <- checkStm fType (env, []) stm2
     Ok (env, aStms ++ [SIfElse exp (head block1) (head block2)])
 
-convertExpression :: Type -> Type -> Exp -> Err Exp
-convertExpression Type_double Type_int exp = Ok (EApp (Id "double") [exp])
+-- Checks that Expected type are equal or larger than actual type
+-- Makes an explicit type conversion on expression if expected type is larger than actual
+convertExpression :: Type -> Type -> A.Exp -> Err A.Exp
+convertExpression Type_double Type_int exp = Ok (double exp)
 convertExpression expected actual exp | expected == actual = Ok exp
 convertExpression _ _ _ = Bad "Incompatible types"
 
-double :: Exp -> Exp
-double exp = EApp (Id "double") [exp]
+double :: A.Exp -> A.Exp
+double (exp, _) = (EApp (Id "double") [exp], Type_double)
 
 extendVar :: Env -> [Arg] -> Err Env
 extendVar env [] = Ok env
@@ -148,28 +150,40 @@ emptyEnv = (predefinedFunctions,[[]])
 predefinedFunctions :: Sig
 predefinedFunctions = [(Id "printInt", ([Type_int], Type_void)), (Id "printDouble", ([Type_double], Type_void)), (Id "readInt", ([], Type_int)), (Id "readDouble", ([], Type_double))]
 
-inferExp :: Env -> Exp -> Err Type 
+inferExp :: Env -> Exp -> Err (Type, A.Exp) 
 inferExp env x = case x of
-    EBool _ -> return Type_bool 
-    EInt _ -> return Type_int 
-    EDouble _ -> return Type_double
-    EId id -> lookupVar env id 
-    EAdd exp1 _ exp2 -> inferBin [Type_int, Type_double] env exp1 exp2
-    EMul exp1 _ exp2 -> inferBin [Type_int, Type_double] env exp1 exp2
-    EPost id _ -> inferUn [Type_double, Type_int] env (EId id)
-    EPre _ id -> inferUn [Type_double, Type_int] env (EId id)
-    ECmp exp1 op exp2 | op == OEq || op == ONEq -> case inferBin [Type_int, Type_double] env exp1 exp2 of
-      Ok _ -> return Type_bool
-      _ -> case inferBin [ Type_bool] env exp1 exp2 of
-        Ok _ -> return Type_bool
-        e -> e
-    ECmp exp1 _ exp2 -> case inferBin [Type_int, Type_double] env exp1 exp2 of
-      Ok _ -> return Type_bool
-      e -> e
-    EAnd exp1 exp2 -> inferBin [Type_bool] env exp1 exp2
-    EOr exp1 exp2 -> inferBin [Type_bool] env exp1 exp2
+    EBool b -> Ok (Type_bool, (A.EBool b, Type_bool))
+    EInt i -> Ok (Type_bool, (A.EInt i, Type_int))
+    EDouble d -> Ok (Type_double, (A.EDouble d, Type_double))
+    EId id -> do
+      typ <- lookupVar env id
+      Ok (typ, (A.EId id, typ)) 
+    EAdd exp1 op exp2 -> do
+      (typ, e1, e2) <- inferNumeric env exp1 exp2
+      Ok (typ, (A.EAdd e1 op e2, typ))
+    EMul exp1 op exp2 -> do 
+      (typ, e1, e2) <- inferNumeric env exp1 exp2
+      Ok (typ, (A.EMul e1 op e2, typ))
+    EPost id op -> do
+      typ <- inferVar [Type_double, Type_int] env id
+      Ok (typ, (A.EPost id op, typ))
+    EPre op id -> do 
+      typ <- inferVar [Type_double, Type_int] env id
+      Ok (typ, (A.EPre op id, typ))
+    ECmp exp1 op exp2 | op == OEq || op == ONEq -> case inferNumeric env exp1 exp2 of
+      Ok (opType, e1, e2) -> Ok (Type_bool, (A.ECmp e1 op e2, opType))
+      _ -> case inferBool env exp1 exp2 of
+        Ok (opType, e1, e2) -> return (Type_bool, (A.ECmp e1 op e2, opType))
+    ECmp exp1 op exp2 -> case inferNumeric env exp1 exp2 of
+      Ok (opType, e1, e2) -> return (Type_bool, (A.ECmp e1 op e2, opType))
+    EAnd exp1 exp2 -> do 
+      (opType, e1, e2) <- inferBool env exp1 exp2
+      Ok (Type_bool, (A.EAnd e1 e2, opType))
+    EOr exp1 exp2 -> do
+      (opType, e1, e2) <- inferBool env exp1 exp2
+      Ok (Type_bool, (A.EOr e1 e2, opType))  
     EAss id exp -> case lookupVar env id of
-        Ok typ -> inferUn (smallerTypes typ) env exp
+        Ok typ -> inferUn (smallerTypes typ) env exp -- convert exp if neccessary med convertExpression
         e -> e
     EApp id args -> do 
         (argTypes, returnType) <- lookupFun env id
@@ -190,32 +204,40 @@ smallerTypes :: Type -> [Type]
 smallerTypes Type_double = [Type_int, Type_double]
 smallerTypes a = [a]
 
-inferUn :: [Type] -> Env -> Exp -> Err Type 
-inferUn types env exp = do
-    typ <- inferExp env exp
+-- checks wether the variable is of allowed type and returns its type
+inferVar :: [Type] -> Env -> Id -> Err Type
+inferVar types env id = do
+    (typ, _) <- inferExp env (EId id)
     if elem typ types
       then
         Ok typ
       else
-        Bad ("wrong type of expression " ++ printTree exp)
+        Bad ("wrong type of variable " ++ printTree (EId id))
 
-inferBin :: [Type] -> Env -> Exp -> Exp -> Err Type 
-inferBin types env exp1 exp2 = do
-    typ1 <- inferExp env exp1 
-    typ2 <- inferExp env exp2 
-    case maxType typ1 typ2 of 
-      Ok typ | elem typ1 types && elem typ2 types -> Ok typ
-      _ -> Bad ("wrong type of expression " ++ printTree exp1)
+-- checks wether the expressions are of allowed types and returns annotated expressions
+-- where operands are typed and coersions made explicit
+inferNumeric :: Env -> Exp -> Exp -> Err (Type, A.Exp, A.Exp) 
+inferNumeric env exp1 exp2 = do
+    (typ1, (e1, opTyp1)) <- inferExp env exp1 
+    (typ2, (e2, opTyp2)) <- inferExp env exp2
+    case (typ1, typ2) of
+      (Type_bool, Type_bool) -> Bad "Incompatible types"  
+      (a, b) | a == b -> Ok (typ1, (e1, opTyp1), (e2, opTyp2))
+      (Type_double, Type_int) -> Ok (typ1, (e1, opTyp1), double (e2, opTyp2))
+      (Type_int, Type_double) -> Ok (typ1, double (e1, opTyp1), (e2, opTyp2))
+      _ -> Bad "Incompatible types"
 
-maxType :: Type -> Type -> Err Type
-maxType Type_int Type_double = Ok Type_double
-maxType Type_double Type_int = Ok Type_double
-maxType a b | a == b = Ok a 
-maxType _ _ = Bad "Incompatible types"
+inferBool :: Env -> Exp -> Exp -> Err (Type, A.Exp, A.Exp) 
+inferBool env exp1 exp2 = do
+    (typ1, (e1, opTyp1)) <- inferExp env exp1 
+    (typ2, (e2, opTyp2)) <- inferExp env exp2
+    case (typ1, typ2) of
+      (Type_bool, Type_bool) -> Ok (typ1, (e1, opTyp1), (e2, opTyp2))
+      _ -> Bad "Incompatible types"
 
 checkExp :: Env -> Exp -> Type -> Err Type
 checkExp env exp typ = do
-  t <- inferExp env exp 
+  (t, _) <- inferExp env exp 
   if t == typ
     then
       Ok typ

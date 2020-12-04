@@ -5,7 +5,8 @@
 module Annotated where
 
 import qualified CMM.Abs as A
-
+import qualified Prelude as C (Eq, Ord, Show, Read)
+import Prelude (Double, Integer)
 -- This is a stub for typed ASTs produced by the type checker
 -- as input for the compiler.
 
@@ -14,3 +15,20 @@ import qualified CMM.Abs as A
 
 type Program = A.Program
 type Stm = A.Stm
+type Exp = (AExp, A.Type)
+
+data AExp
+    = EBool A.BoolLit
+    | EInt Integer
+    | EDouble Double
+    | EId A.Id
+    | EApp A.Id [Exp]
+    | EPost A.Id A.IncDecOp
+    | EPre A.IncDecOp A.Id
+    | EMul Exp A.MulOp Exp
+    | EAdd Exp A.AddOp Exp
+    | ECmp Exp A.CmpOp Exp
+    | EAnd Exp Exp
+    | EOr Exp Exp
+    | EAss A.Id Exp
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
