@@ -35,55 +35,63 @@ type Sig = [(Id, ([Type], Type))]
 type Context = [(Id, Type)]
 
 -- check a whole program
-typecheck :: Program -> Either TypeError A.Program
+typecheck :: Program -> Err A.Program
 typecheck (PDefs []) = Bad "Empty program"
 typecheck (PDefs defs) | not (elem (Id "main") (map getFunId defs)) = Bad "Empty program"
 typecheck (PDefs defs) = do
     env <- extendFun emptyEnv defs
-    checkFun env defs
+    checkFun [] env defs
 
-checkFun :: Env -> [Def] -> Either TypeError A.Program
-checkFun _ [] = Ok ()
-checkFun env ((DFun fType id args stmts):defs) = do
+checkFun :: [Def] -> Env -> [Def] -> Err A.Program
+checkFun aStms _ [] = Ok (PDefs aStms)
+checkFun aStms env ((DFun fType id args stmts):defs) = do
   newEnv <- extendVar env args
-  case checkStms fType newEnv stmts of
-    Ok _ -> checkFun env defs
+  case checkStms fType (newEnv, []) stmts of
+    Ok _ -> checkFun (aStms ++ [DFun fType id args stmts]) env defs
     Bad s -> Bad s
 
-checkStms :: Type -> Env -> [Stm] -> Err Env
+checkStms :: Type -> (Env, [A.Stm]) -> [Stm] -> Err (Env, [A.Stm])
 checkStms fType = foldM (checkStm fType)
 
-checkStm :: Type -> Env -> Stm -> Err Env 
-checkStm fType env stm = case stm of
+
+checkStm :: Type -> (Env, [A.Stm]) -> Stm -> Err (Env, [A.Stm])
+checkStm fType (env, aStms) stm = case stm of
   SExp exp -> do 
     inferExp env exp 
-    return env
-  SDecls _ [] -> Ok env 
+    return (env, aStms ++ [stm])
+  SDecls _ [] -> Ok (env, aStms ++ [stm]) 
   SDecls varType (id:ids) -> do 
     newEnv <- updateVar env id varType
-    checkStm fType newEnv (SDecls varType ids)
+    checkStm fType (newEnv, aStms ++ [stm]) (SDecls varType ids)
   SInit varType id exp -> do 
-    env1 <- checkStm fType env (SDecls varType [id])
-    expType <- inferExp env1 exp
-    case maxType expType varType of 
-      Ok typ | varType == typ -> Ok env1
-      _ -> Bad "Wrong type in variable initialization"
+    (newEnv, newAStms) <- checkStm fType (env, aStms) (SDecls varType [id])
+    expType <- inferExp newEnv exp
+    cExp <- convertExpression varType expType exp
+    Ok (newEnv, newAStms ++ [SInit varType id (double cExp)])
   SReturn exp -> do
     expType <- inferExp env exp
-    case maxType expType fType of
-      Ok typ | typ == fType -> Ok env
-      _ -> Bad "Wrong return type in function"
-  SWhile exp stm -> do 
+    cExp <- convertExpression fType expType exp
+    Ok (env, aStms ++ [SReturn (double cExp)])
+  SWhile exp block -> do
     checkExp env exp Type_bool
-    checkStm fType env (SBlock [stm])
-  SBlock stms -> case checkStms fType (newBlock env) stms of
-    Ok _ -> return env
+    (_, stms) <- checkStm fType (env, []) block
+    Ok (env, aStms ++ [SWhile exp (head stms)])
+  SBlock stms -> case checkStms fType (newBlock env, []) stms of
+    Ok (_, blockStms) -> return (env, aStms ++ [SBlock blockStms])
     e -> e
   SIfElse exp stm1 stm2 -> do
-    cond <- inferExp env exp
-    case cond of
-      Type_bool -> checkStms fType env [SBlock [stm1], SBlock [stm2]]
-      _ -> Bad "Condition not of type Bool"
+    checkExp env exp Type_bool
+    (_, block1) <- checkStm fType (env, []) stm1
+    (_, block2) <- checkStm fType (env, []) stm2
+    Ok (env, aStms ++ [SIfElse exp (head block1) (head block2)])
+
+convertExpression :: Type -> Type -> Exp -> Err Exp
+convertExpression Type_double Type_int exp = Ok (EApp (Id "double") [exp])
+convertExpression expected actual exp | expected == actual = Ok exp
+convertExpression _ _ _ = Bad "Incompatible types"
+
+double :: Exp -> Exp
+double exp = EApp (Id "double") [exp]
 
 extendVar :: Env -> [Arg] -> Err Env
 extendVar env [] = Ok env

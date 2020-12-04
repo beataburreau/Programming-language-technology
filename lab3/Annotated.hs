@@ -13,3 +13,4 @@ import qualified CMM.Abs as A
 -- untyped ASTs here.
 
 type Program = A.Program
+type Stm = A.Stm
