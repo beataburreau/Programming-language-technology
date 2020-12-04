@@ -182,20 +182,22 @@ inferExp env x = case x of
     EOr exp1 exp2 -> do
       (opType, e1, e2) <- inferBool env exp1 exp2
       Ok (Type_bool, (A.EOr e1 e2, opType))  
-    EAss id exp -> case lookupVar env id of
-        Ok typ -> inferUn (smallerTypes typ) env exp -- convert exp if neccessary med convertExpression
-        e -> e
+    EAss id exp -> do
+      expectedType <- lookupVar env id
+      (actualType, newExp) <- inferExp env exp
+      cExp <- convertExpression expectedType actualType newExp
+      Ok (actualType, (A.EAss id cExp, actualType))
     EApp id args -> do 
         (argTypes, returnType) <- lookupFun env id
-        passedTypes <- mapRight (inferExp env) args
+        aArgs <- mapRight (inferExp env) args
         if length argTypes /= length args 
           then Bad "Incorrect number of function arguments"
           else
-            if all contains (zip passedTypes (map smallerTypes argTypes))
+            if all contains (zip (map fst aArgs) (map smallerTypes argTypes))
               then
-                Ok returnType
+                Ok (returnType, (A.EApp id (map snd aArgs), Type_void))
               else
-                Bad ("wrong type of function. Expected " ++ show argTypes ++ " but got " ++ show passedTypes)
+                Bad ("wrong type of function. Expected " ++ show argTypes ++ " but got " ++ show (map fst aArgs))
 
 contains :: (Type, [Type]) -> Bool
 contains (a, b) = elem a b

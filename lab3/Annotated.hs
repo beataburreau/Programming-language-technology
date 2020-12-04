@@ -17,7 +17,7 @@ type Program = A.Program
 type Exp = (AExp, A.Type)
 
 data Stm
-    = SExp AExp
+    = SExp Exp
     | SDecls A.Type [A.Id]
     | SInit A.Type A.Id Exp
     | SReturn Exp
