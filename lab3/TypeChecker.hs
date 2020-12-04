@@ -57,33 +57,33 @@ checkStms fType = foldM (checkStm fType)
 checkStm :: Type -> (Env, [A.Stm]) -> Stm -> Err (Env, [A.Stm])
 checkStm fType (env, aStms) stm = case stm of
   SExp exp -> do 
-    inferExp env exp 
-    return (env, aStms ++ [stm])
-  SDecls _ [] -> Ok (env, aStms ++ [stm]) 
+    (_, e) <- inferExp env exp 
+    return (env, aStms ++ [A.SExp e])
+  SDecls _ [] -> Ok (env, aStms)
   SDecls varType (id:ids) -> do 
     newEnv <- updateVar env id varType
-    checkStm fType (newEnv, aStms ++ [stm]) (SDecls varType ids)
+    checkStm fType (newEnv, aStms ++ [A.SDecls varType [id]]) (SDecls varType ids)
   SInit varType id exp -> do 
     (newEnv, newAStms) <- checkStm fType (env, aStms) (SDecls varType [id])
     (typ, newExp) <- inferExp newEnv exp
     cExp <- convertExpression varType typ newExp
-    Ok (newEnv, newAStms ++ [SInit varType id (double cExp)])
+    Ok (newEnv, newAStms ++ [A.SInit varType id (double cExp)])
   SReturn exp -> do
     (typ, newExp) <- inferExp env exp
     cExp <- convertExpression fType typ newExp
-    Ok (env, aStms ++ [SReturn (double cExp)])
+    Ok (env, aStms ++ [A.SReturn (double cExp)])
   SWhile exp block -> do
-    checkExp env exp Type_bool
+    (Type_bool, e) <- inferExp env exp
     (_, stms) <- checkStm fType (env, []) block
-    Ok (env, aStms ++ [SWhile exp (head stms)])
+    Ok (env, aStms ++ [A.SWhile e (head stms)])
   SBlock stms -> case checkStms fType (newBlock env, []) stms of
-    Ok (_, blockStms) -> return (env, aStms ++ [SBlock blockStms])
+    Ok (_, blockStms) -> return (env, aStms ++ [A.SBlock blockStms])
     e -> e
   SIfElse exp stm1 stm2 -> do
-    checkExp env exp Type_bool
+    (Type_bool, e) <- inferExp env exp
     (_, block1) <- checkStm fType (env, []) stm1
     (_, block2) <- checkStm fType (env, []) stm2
-    Ok (env, aStms ++ [SIfElse exp (head block1) (head block2)])
+    Ok (env, aStms ++ [A.SIfElse e (head block1) (head block2)])
 
 -- Checks that Expected type are equal or larger than actual type
 -- Makes an explicit type conversion on expression if expected type is larger than actual
@@ -93,7 +93,7 @@ convertExpression expected actual exp | expected == actual = Ok exp
 convertExpression _ _ _ = Bad "Incompatible types"
 
 double :: A.Exp -> A.Exp
-double (exp, _) = (EApp (Id "double") [exp], Type_double)
+double aExp = (A.EApp (Id "double") [aExp], Type_double)
 
 extendVar :: Env -> [Arg] -> Err Env
 extendVar env [] = Ok env

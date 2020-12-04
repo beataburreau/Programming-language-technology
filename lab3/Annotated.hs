@@ -14,8 +14,17 @@ import Prelude (Double, Integer)
 -- untyped ASTs here.
 
 type Program = A.Program
-type Stm = A.Stm
 type Exp = (AExp, A.Type)
+
+data Stm
+    = SExp AExp
+    | SDecls A.Type [A.Id]
+    | SInit A.Type A.Id Exp
+    | SReturn Exp
+    | SWhile Exp Stm
+    | SBlock [Stm]
+    | SIfElse Exp Stm Stm
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 data AExp
     = EBool A.BoolLit
