@@ -6,3 +6,5 @@ CMM
 *.progs-test-lab2
 lab2/lab2
 lab2/CMM/*
+*.j
+*.class

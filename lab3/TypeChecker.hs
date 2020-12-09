@@ -42,12 +42,12 @@ typecheck (PDefs defs) = do
     env <- extendFun emptyEnv defs
     checkFun [] env defs
 
-checkFun :: [Def] -> Env -> [Def] -> Err A.Program
-checkFun aStms _ [] = Ok (PDefs aStms)
+checkFun :: [A.Def] -> Env -> [Def] -> Err A.Program
+checkFun aStms _ [] = Ok (A.PDefs aStms)
 checkFun aStms env ((DFun fType id args stmts):defs) = do
   newEnv <- extendVar env args
   case checkStms fType (newEnv, []) stmts of
-    Ok _ -> checkFun (aStms ++ [DFun fType id args stmts]) env defs
+    Ok (_, aastmts) -> checkFun (aStms ++ [A.DFun fType id args aastmts]) env defs
     Bad s -> Bad s
 
 checkStms :: Type -> (Env, [A.Stm]) -> [Stm] -> Err (Env, [A.Stm])
@@ -73,24 +73,32 @@ checkStm fType (env, aStms) stm = case stm of
     cExp <- convertExpression fType typ newExp
     Ok (env, aStms ++ [A.SReturn (double cExp)])
   SWhile exp block -> do
-    (Type_bool, e) <- inferExp env exp
-    (_, stms) <- checkStm fType (env, []) block
-    Ok (env, aStms ++ [A.SWhile e (head stms)])
+    (conditionType, e) <- inferExp env exp
+    if conditionType /= Type_bool 
+      then 
+        Bad "Condition in while statement must be Bool"
+      else do   
+        (_, stms) <- checkStm fType (env, []) block
+        Ok (env, aStms ++ [A.SWhile e (head stms)])
   SBlock stms -> case checkStms fType (newBlock env, []) stms of
     Ok (_, blockStms) -> return (env, aStms ++ [A.SBlock blockStms])
     e -> e
   SIfElse exp stm1 stm2 -> do
-    (Type_bool, e) <- inferExp env exp
-    (_, block1) <- checkStm fType (env, []) stm1
-    (_, block2) <- checkStm fType (env, []) stm2
-    Ok (env, aStms ++ [A.SIfElse e (head block1) (head block2)])
+    (conditionType, e) <- inferExp env exp
+    if conditionType /= Type_bool 
+      then 
+        Bad "Condition in if statement must be Bool"
+      else do   
+        (_, block1) <- checkStm fType (env, []) stm1
+        (_, block2) <- checkStm fType (env, []) stm2
+        Ok (env, aStms ++ [A.SIfElse e (head block1) (head block2)])
 
 -- Checks that Expected type are equal or larger than actual type
 -- Makes an explicit type conversion on expression if expected type is larger than actual
 convertExpression :: Type -> Type -> A.Exp -> Err A.Exp
 convertExpression Type_double Type_int exp = Ok (double exp)
 convertExpression expected actual exp | expected == actual = Ok exp
-convertExpression _ _ _ = Bad "Incompatible types"
+convertExpression expected actual exp = Bad ("Incompatible types " ++ show expected ++ ", " ++ show actual ++ ": " ++ show exp)
 
 double :: A.Exp -> A.Exp
 double aExp = (A.EApp (Id "double") [aExp], Type_double)
@@ -153,7 +161,7 @@ predefinedFunctions = [(Id "printInt", ([Type_int], Type_void)), (Id "printDoubl
 inferExp :: Env -> Exp -> Err (Type, A.Exp) 
 inferExp env x = case x of
     EBool b -> Ok (Type_bool, (A.EBool b, Type_bool))
-    EInt i -> Ok (Type_bool, (A.EInt i, Type_int))
+    EInt i -> Ok (Type_int, (A.EInt i, Type_int))
     EDouble d -> Ok (Type_double, (A.EDouble d, Type_double))
     EId id -> do
       typ <- lookupVar env id

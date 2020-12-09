@@ -13,8 +13,12 @@ import Prelude (Double, Integer)
 -- To make the stub compile, we just define an alias to
 -- untyped ASTs here.
 
-type Program = A.Program
+data Program = PDefs [Def]
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
 type Exp = (AExp, A.Type)
+
+data Def = DFun A.Type A.Id [A.Arg] [Stm]
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 data Stm
     = SExp Exp
