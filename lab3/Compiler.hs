@@ -19,7 +19,7 @@ import Data.List ( intercalate )
 
 import Annotated as A
 import CMM.Abs
-import TypeChecker ( getArgType )
+import TypeChecker (getArgId,  getArgType )
 
 type Env = ([(Id, String)], [(Id, Int)], Int, Int)
 -- (funTypes, varAdresses, varCounter, jumpCounter)
@@ -89,7 +89,7 @@ function env@(funs, _, _, jmpC) (A.DFun typ id args stms) = (unlines $ concat
   where 
     (code, newEnv) = foldl statement ([""], (funs, vars, varC, jmpC)) stms
     varC = sum $ map (size . getArgType) args
-    vars = zip [0, 1 ..] map (getArgId) args
+    vars = zip (map getArgId args) [0..] 
 
 size :: Type -> Int
 size Type_double = 2

@@ -117,7 +117,10 @@ extendFun env ((DFun typ id args _):defs) = case updateFun env id (map getArgTyp
   e -> e
 
 getArgType :: Arg -> Type
-getArgType (ADecl typ _) = typ 
+getArgType (ADecl typ _) = typ
+
+getArgId :: Arg -> Id
+getArgId (ADecl _ id) = id
 
 lookupVar :: Env -> Id -> Err Type
 lookupVar (_, []) _ = Bad "Variable not declared"
