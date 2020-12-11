@@ -75,17 +75,27 @@ compile name _prg = header ++ "\n" ++ body (makeEnv name _prg) _prg
     ]
 
 body :: Env -> A.Program -> String
-body env (A.PDefs (def:defs)) = function env def ++ body env (A.PDefs defs)
+body env@(funs, vars, varC, _) (A.PDefs (def:defs)) = funCode ++ body (funs, vars, varC, jumpC) (A.PDefs defs)
+  where 
+    (funCode, (_, _, _, jumpC)) = function env def
 
 -- DFun A.Type A.Id [A.Arg] [Stm]
-function :: Env -> A.Def -> String
-function env (A.DFun typ id args stms) = unlines $ concat
+function :: Env -> A.Def -> (String, Env)
+function env@(funs, _, _, jmpC) (A.DFun typ id args stms) = (unlines $ concat
   [ [".method public static " ++ getSignature "" (A.DFun typ id args stms)],
     reverse $ map indent code, 
     [".end method"]
-  ]
-  where
-    (code, _) = foldl statement ([""], env) stms
+  ], newEnv)
+  where 
+    (code, newEnv) = foldl statement ([""], (funs, vars, varC, jmpC)) stms
+    varC = sum $ map (size . getArgType) args
+    vars = zip [0, 1 ..] map (getArgId) args
+
+size :: Type -> Int
+size Type_double = 2
+size Type_int = 1
+size Type_bool = 1
+size Type_void = 0
 
 statement :: ([String], Env) -> A.Stm -> ([String], Env)
 statement (code, env@(funs, vars, varC, jmpC)) stmt = 
@@ -95,13 +105,13 @@ statement (code, env@(funs, vars, varC, jmpC)) stmt =
     _ -> ("pop": newCode, expEnv)
     where 
       (newCode, expEnv) = expression (code, env) exp  
-  (A.SDecls _ [id]) -> (newCode, newEnv)
+  (A.SDecls typ [id]) -> (newCode, newEnv)
     where
       newCode = (";; declare " ++ show id ++ " variable"):code
-      newEnv = (funs, (id, varC):vars, varC + 1, jmpC)
+      newEnv = (funs, (id, varC):vars, varC + size typ, jmpC)
   (A.SInit typ id exp) -> (store typ varC:newCode, expEnv)
     where
-      newEnv = (funs, (id, varC):vars, varC + 1, jmpC)
+      newEnv = (funs, (id, varC):vars, varC + size typ, jmpC)
       (newCode, expEnv) = expression (code, newEnv) exp
   (A.SReturn (e, typ)) -> (ret typ:newCode, expEnv)
     where
@@ -143,7 +153,7 @@ label :: Int -> String
 label i = "L" ++ show i
 
 expression :: ([String], Env) -> A.Exp -> ([String], Env)
-expression (code, env@(funs, vars, varC, jmpC)) exp =
+expression (code, env@(funs, vars, _, _)) exp =
   case exp of 
     (A.EBool LTrue, _) -> ("iconst_1":code, env)
     (A.EBool LFalse, _) -> ("iconst_0":code, env)
@@ -180,16 +190,36 @@ expression (code, env@(funs, vars, varC, jmpC)) exp =
     (A.EAdd exp1 addOp exp2, typ) -> (add typ addOp:expCode, newEnv)
       where 
         (expCode, newEnv) = foldl expression (code, env) [exp1, exp2]
-    (A.ECmp exp1 cmpOp exp2, typ) -> (cmp typ cmpOp:expCode, newEnv)
+    (A.ECmp exp1 cmpOp exp2, typ) -> (cmpCode ++ expCode, (f, v, vC, jC + 2))
+      where 
+        (expCode, (f, v, vC, jC)) = foldl expression (code, env) [exp1, exp2]
+        cmpCode = reverse [
+          cmpChar typ ++ "cmp",
+          op ++ " L" ++ show jC,
+          "iconst_0",
+          "goto L" ++ show (jC + 1),
+          "L" ++ show jC ++ ":",
+          "iconst_1",
+          "L" ++ show (jC + 1) ++ ":"
+          ]
+        op = case cmpOp of 
+          OLt -> "iflt"
+          OGt -> "ifgt"
+          OLtEq -> "ifle"
+          OGtEq -> "ifge"
+          OEq -> "ifeq"
+          ONEq -> "ifne"
+    (A.EAnd exp1 exp2, _) -> ("iand":expCode, newEnv)
       where 
         (expCode, newEnv) = foldl expression (code, env) [exp1, exp2]
-
--- | ECmp Exp A.CmpOp Exp
--- | EAnd Exp Exp
--- | EOr Exp Exp
--- | EAss A.Id Exp
--- type Env = ([(Id, String)], [(Id, Int)], Int, Int)
--- (funTypes, varAdresses, varCounter, jumpCounter)
+    (A.EOr exp1 exp2, _) -> ("ior":expCode, newEnv)
+      where 
+        (expCode, newEnv) = foldl expression (code, env) [exp1, exp2]
+    (A.EAss id exp, typ) -> ((typeChar typ ++ "store " ++ show varAdr) :expCode, newEnv)
+      where
+        (expCode, newEnv) = expression (code, env) exp
+        varAdr = case lookup id vars of
+          Just adr -> adr
 
 incDecInt :: IncDecOp -> String
 incDecInt OInc = "1"
@@ -203,10 +233,9 @@ add :: Type -> AddOp -> String
 add t OPlus = typeChar t ++ "add"
 add t OMinus = typeChar t ++ "add"
 
-cmp :: Type -> CmpOp -> String
-cmp Type_int OGt = "lcmp"
-
--- OLt | OGt | OLtEq | OGtEq | OEq | ONEq
+cmpChar :: Type -> String
+cmpChar Type_int = "l"
+cmpChar Type_double = "d"
 
 store :: Type -> Int -> String
 store typ adr = typeChar typ ++ "store_" ++ show adr
@@ -215,8 +244,14 @@ ret :: Type -> String
 ret typ = typeChar typ ++ "return"
 
 makeEnv :: String -> A.Program -> Env
-makeEnv name (A.PDefs defs) = (zip (map (\(A.DFun _ id _ _) -> id) defs) (map (getSignature name) defs), [], 0, 0)
--- TODO lägg in de inbygda funktionernas signaturer
+makeEnv name (A.PDefs defs) = (funs, [], 0, 0)
+  where
+    funs = zip (map (\(A.DFun _ id _ _) -> id) defs) (map (getSignature name) defs) ++ 
+      [(Id "readInt", "Runtime/readInt()I"), 
+      (Id "readDouble", "Runtime/readDouble()D"), 
+      (Id "printInt", "Runtime/printInt(I)V"),
+      (Id "printDouble", "Runtime/printDouble(D)V"),
+      (Id "double", "Runtime/toDouble(I)D")]
 
 getSignature :: String -> A.Def -> String
 getSignature "" (A.DFun typ (Id id) args _) = id ++ "(" ++ intercalate ";" (map (typeFlag . getArgType) args) ++ ")" ++ typeFlag typ

@@ -20,4 +20,8 @@ public class Runtime {
         return scan.nextDouble();
     }
 
+    public static double toDouble (int x) {
+        return (double) x;
+    }
+
 }
