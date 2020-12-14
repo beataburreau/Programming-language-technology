@@ -47,6 +47,7 @@ compile name _prg = header ++ "\n" ++ body (makeEnv name _prg) _prg
       , ""
       , ".method public <init>()V"
       , ".limit locals 1"
+      , ".limit stack 1"
       , ""
       ]
     , map indent
@@ -75,6 +76,7 @@ compile name _prg = header ++ "\n" ++ body (makeEnv name _prg) _prg
     ]
 
 body :: Env -> A.Program -> String
+body _ (A.PDefs []) = ""
 body env@(funs, vars, varC, _) (A.PDefs (def:defs)) = funCode ++ body (funs, vars, varC, jumpC) (A.PDefs defs)
   where 
     (funCode, (_, _, _, jumpC)) = function env def
@@ -83,13 +85,19 @@ body env@(funs, vars, varC, _) (A.PDefs (def:defs)) = funCode ++ body (funs, var
 function :: Env -> A.Def -> (String, Env)
 function env@(funs, _, _, jmpC) (A.DFun typ id args stms) = (unlines $ concat
   [ [".method public static " ++ getSignature "" (A.DFun typ id args stms)],
+    [".limit locals " ++ show newVarC],
+    [".limit stack " ++ "200"],
     reverse $ map indent code, 
+    [return],
     [".end method"]
   ], newEnv)
   where 
-    (code, newEnv) = foldl statement ([""], (funs, vars, varC, jmpC)) stms
+    (code, newEnv@(_, _, newVarC, _)) = foldl statement ([""], (funs, vars, varC, jmpC)) stms
     varC = sum $ map (size . getArgType) args
-    vars = zip (map getArgId args) [0..] 
+    vars = zip (map getArgId args) [0..]
+    return = case typ of
+      Type_void -> "return"
+      _ -> ""
 
 size :: Type -> Int
 size Type_double = 2
@@ -215,7 +223,7 @@ expression (code, env@(funs, vars, _, _)) exp =
     (A.EOr exp1 exp2, _) -> ("ior":expCode, newEnv)
       where 
         (expCode, newEnv) = foldl expression (code, env) [exp1, exp2]
-    (A.EAss id exp, typ) -> ((typeChar typ ++ "store " ++ show varAdr) :expCode, newEnv)
+    (A.EAss id exp, typ) -> ([typeChar typ ++ "store " ++ show varAdr, "dup"] ++ expCode, newEnv)
       where
         (expCode, newEnv) = expression (code, env) exp
         varAdr = case lookup id vars of
@@ -231,7 +239,7 @@ mul t ODiv = typeChar t ++ "div"
 
 add :: Type -> AddOp -> String
 add t OPlus = typeChar t ++ "add"
-add t OMinus = typeChar t ++ "add"
+add t OMinus = typeChar t ++ "sub"
 
 cmpChar :: Type -> String
 cmpChar Type_int = "l"
@@ -254,8 +262,8 @@ makeEnv name (A.PDefs defs) = (funs, [], 0, 0)
       (Id "double", "Runtime/toDouble(I)D")]
 
 getSignature :: String -> A.Def -> String
-getSignature "" (A.DFun typ (Id id) args _) = id ++ "(" ++ intercalate ";" (map (typeFlag . getArgType) args) ++ ")" ++ typeFlag typ
-getSignature name (A.DFun typ (Id id) args _) = name ++ "/" ++ id ++ "(" ++ intercalate ";" (map (typeFlag . getArgType) args) ++ ")" ++ typeFlag typ
+getSignature "" (A.DFun typ (Id id) args _) = id ++ "(" ++ concatMap (typeFlag . getArgType) args ++ ")" ++ typeFlag typ
+getSignature name (A.DFun typ (Id id) args _) = name ++ "/" ++ id ++ "(" ++ concatMap (typeFlag . getArgType) args ++ ")" ++ typeFlag typ
 
 typeChar :: Type -> String
 typeChar Type_double = "d"

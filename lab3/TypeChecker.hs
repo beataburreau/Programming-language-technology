@@ -67,11 +67,11 @@ checkStm fType (env, aStms) stm = case stm of
     (newEnv, newAStms) <- checkStm fType (env, aStms) (SDecls varType [id])
     (typ, newExp) <- inferExp newEnv exp
     cExp <- convertExpression varType typ newExp
-    Ok (newEnv, newAStms ++ [A.SInit varType id (double cExp)])
+    Ok (newEnv, newAStms ++ [A.SInit varType id cExp])
   SReturn exp -> do
     (typ, newExp) <- inferExp env exp
     cExp <- convertExpression fType typ newExp
-    Ok (env, aStms ++ [A.SReturn (double cExp)])
+    Ok (env, aStms ++ [A.SReturn cExp])
   SWhile exp block -> do
     (conditionType, e) <- inferExp env exp
     if conditionType /= Type_bool 
