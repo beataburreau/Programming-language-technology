@@ -64,10 +64,10 @@ checkStm fType (env, aStms) stm = case stm of
     newEnv <- updateVar env id varType
     checkStm fType (newEnv, aStms ++ [A.SDecls varType [id]]) (SDecls varType ids)
   SInit varType id exp -> do 
-    (newEnv, newAStms) <- checkStm fType (env, aStms) (SDecls varType [id])
+    (newEnv, _) <- checkStm fType (env, aStms) (SDecls varType [id])
     (typ, newExp) <- inferExp newEnv exp
     cExp <- convertExpression varType typ newExp
-    Ok (newEnv, newAStms ++ [A.SInit varType id cExp])
+    Ok (newEnv, aStms ++ [A.SInit varType id cExp])
   SReturn exp -> do
     (typ, newExp) <- inferExp env exp
     cExp <- convertExpression fType typ newExp
@@ -89,8 +89,8 @@ checkStm fType (env, aStms) stm = case stm of
       then 
         Bad "Condition in if statement must be Bool"
       else do   
-        (_, block1) <- checkStm fType (env, []) stm1
-        (_, block2) <- checkStm fType (env, []) stm2
+        (_, block1) <- checkStm fType (newBlock env, []) stm1
+        (_, block2) <- checkStm fType (newBlock env, []) stm2
         Ok (env, aStms ++ [A.SIfElse e (head block1) (head block2)])
 
 -- Checks that Expected type are equal or larger than actual type

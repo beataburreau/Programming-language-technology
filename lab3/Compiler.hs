@@ -110,6 +110,7 @@ statement (code, env@(funs, vars, varC, jmpC)) stmt =
   case stmt of 
   (A.SExp exp@(_, typ)) -> case typ of
     Type_void -> (newCode, expEnv)
+    Type_double -> ("pop2": newCode, expEnv)
     _ -> ("pop": newCode, expEnv)
     where 
       (newCode, expEnv) = expression (code, env) exp  
@@ -124,37 +125,39 @@ statement (code, env@(funs, vars, varC, jmpC)) stmt =
   (A.SReturn (e, typ)) -> (ret typ:newCode, expEnv)
     where
       (newCode, expEnv) = expression (code, env) (e, typ)
-  (A.SWhile exp stmt) -> (whileCode ++ code, (funs, vars, varC, newjmpC + 2))
+  (A.SWhile exp stmt) -> (whileCode ++ code, (funs, vars, newVarC, newjmpC + 2))
     where
        (condCode, condEnv) = expression ([], env) exp
-       (stmtCode, (_, _, _, newjmpC)) = statement ([], condEnv) stmt
+       (stmtCode, (_, _, newVarC, newjmpC)) = statement ([], condEnv) stmt
        condLabel = label (newjmpC + 1)
        blockLabel = label newjmpC
        whileCode = reverse $ concat [
-         ["goto " ++ condLabel, blockLabel ++ ":"],
+         ["goto " ++ condLabel],
+         [blockLabel ++ ":"],
          reverse stmtCode, 
          [condLabel ++ ":"], 
-         reverse condCode, 
-         ["iconst_1", "ifeq " ++ blockLabel]
+         reverse condCode,
+         ["ifgt " ++ blockLabel]
         ]
-  (A.SBlock stmts) -> (newCode, (funs, vars, varC, newjmpC))
+  (A.SBlock stmts) -> (newCode, (funs, vars, newVarC, newjmpC))
     where
-      (newCode, (_, _, _, newjmpC)) = foldl statement (code, env) stmts
-  (A.SIfElse cond thenStmt elseStmt) -> (ifElseCode ++ code, (funs, vars, varC, newjmpC + 2))
+      (newCode, (_, _, newVarC, newjmpC)) = foldl statement (code, env) stmts
+  (A.SIfElse cond thenStmt elseStmt) -> (ifElseCode ++ code, (funs, vars, newVarC, newjmpC + 2))
     where
       (condCode, condEnv) = expression ([], env) cond
       (thenCode, thenEnv) = statement ([], condEnv) thenStmt
-      (elseCode, (_, _, _, newjmpC)) = statement ([], thenEnv) elseStmt
+      (elseCode, (_, _, newVarC, newjmpC)) = statement ([], thenEnv) elseStmt
       elseLabel = label newjmpC
       endLabel = label (newjmpC + 1)
       ifElseCode = reverse $ concat [
         reverse condCode,
-        ["iconst_0", "ifeq " ++ elseLabel],
+        ["ifeq " ++ elseLabel],
         reverse thenCode,
-        ["goto " ++ endLabel,
-        elseLabel ++ ":"],
+        ["goto " ++ endLabel],
+        [elseLabel ++ ":"],
         reverse elseCode,
-        [endLabel ++ ":"]
+        [endLabel ++ ":"],
+        ["nop"]
         ]
 
 label :: Int -> String
@@ -174,22 +177,20 @@ expression (code, env@(funs, vars, _, _)) exp =
     (A.EInt i, _) -> (("sipush " ++ show i):code, env)
     (A.EDouble 0.0, _) -> ("dconst_0":code, env)
     (A.EDouble 1.0, _) -> ("dconst_1":code, env)
-    (A.EDouble d, _) -> (("ldc_w " ++ show d):code, env)
+    (A.EDouble d, _) -> (("ldc2_w " ++ show d):code, env)
     (A.EId id, typ) -> case lookup id vars of
       Just vNum -> ((typeChar typ ++ "load " ++ show vNum ):code, env)
     (A.EApp id args, _) -> case lookup id funs of 
       Just sign -> (("invokestatic " ++ sign):argCode, newEnv)
         where (argCode, newEnv) = foldl expression (code, env) args
-    (A.EPost id op, typ) -> ([incOp, loadOp] ++ code, env)
+    (A.EPost id op, typ) -> (inc op typ varAdr ++ [loadOp] ++ code, env)
       where
         loadOp = typeChar typ ++ "load " ++ show varAdr
-        incOp = typeChar typ ++ "inc " ++ show varAdr ++ " " ++ incDecInt op
         varAdr = case lookup id vars of
           Just adr -> adr
-    (A.EPre op id, typ) -> ([loadOp, incOp] ++ code, env)
+    (A.EPre op id, typ) -> ([loadOp] ++ inc op typ varAdr ++ code, env)
       where
         loadOp = typeChar typ ++ "load " ++ show varAdr
-        incOp = typeChar typ ++ "inc " ++ show varAdr ++ " " ++ incDecInt op
         varAdr = case lookup id vars of
           Just adr -> adr
     (A.EMul exp1 mulOp exp2, typ) -> (mul typ mulOp:expCode, newEnv)
@@ -198,11 +199,16 @@ expression (code, env@(funs, vars, _, _)) exp =
     (A.EAdd exp1 addOp exp2, typ) -> (add typ addOp:expCode, newEnv)
       where 
         (expCode, newEnv) = foldl expression (code, env) [exp1, exp2]
-    (A.ECmp exp1 cmpOp exp2, typ) -> (cmpCode ++ expCode, (f, v, vC, jC + 2))
+    (A.ECmp exp1 cmpOp exp2, typ) -> (cmpCode ++ convertType:expCode2, (f, v, vC, jC + 2))
       where 
-        (expCode, (f, v, vC, jC)) = foldl expression (code, env) [exp1, exp2]
+        (expCode1, newEnv) = expression (code, env) exp1
+        (expCode2, (f, v, vC, jC)) = expression (convertType:expCode1, newEnv) exp2
+        convertType = case typ of 
+          Type_int -> "i2l"
+          Type_bool -> "i2l"
+          _ -> ""
         cmpCode = reverse [
-          cmpChar typ ++ "cmp",
+          cmp typ,
           op ++ " L" ++ show jC,
           "iconst_0",
           "goto L" ++ show (jC + 1),
@@ -217,13 +223,31 @@ expression (code, env@(funs, vars, _, _)) exp =
           OGtEq -> "ifge"
           OEq -> "ifeq"
           ONEq -> "ifne"
-    (A.EAnd exp1 exp2, _) -> ("iand":expCode, newEnv)
+    (A.EAnd exp1 exp2, _) -> (andCode ++ expCode2, (f2, v2, vC2, jC2 + 2))
       where 
-        (expCode, newEnv) = foldl expression (code, env) [exp1, exp2]
-    (A.EOr exp1 exp2, _) -> ("ior":expCode, newEnv)
+        (expCode1, newEnv) = expression (code, env) exp1
+        (expCode2, (f2, v2, vC2, jC2)) = expression (("ifeq L" ++ show jC2):expCode1, newEnv) exp2
+        andCode = reverse [
+          "ifeq L" ++ show jC2,
+          "iconst_1",
+          "goto L" ++ show (jC2 + 1),
+          "L" ++ show jC2  ++ ":",
+          "iconst_0",
+          "L" ++ show (jC2 + 1) ++ ":"
+          ]
+    (A.EOr exp1 exp2, _) -> (orCode ++ expCode2, (f2, v2, vC2, jC2 + 2))
       where 
-        (expCode, newEnv) = foldl expression (code, env) [exp1, exp2]
-    (A.EAss id exp, typ) -> ([typeChar typ ++ "store " ++ show varAdr, "dup"] ++ expCode, newEnv)
+        (expCode1, newEnv) = expression (code, env) exp1
+        (expCode2, (f2, v2, vC2, jC2)) = expression (("ifgt L" ++ show jC2):expCode1, newEnv) exp2
+        orCode = reverse [
+          "ifgt L" ++ show jC2,
+          "iconst_0",
+          "goto L" ++ show (jC2 + 1),
+          "L" ++ show jC2  ++ ":",
+          "iconst_1",
+          "L" ++ show (jC2 + 1) ++ ":"
+          ]
+    (A.EAss id exp, typ) -> ([typeChar typ ++ "store " ++ show varAdr, dup typ] ++ expCode, newEnv)
       where
         (expCode, newEnv) = expression (code, env) exp
         varAdr = case lookup id vars of
@@ -233,6 +257,19 @@ incDecInt :: IncDecOp -> String
 incDecInt OInc = "1"
 incDecInt ODec = "-1"
 
+dup :: Type -> String
+dup Type_double = "dup2"
+dup _ = "dup"
+
+inc :: IncDecOp -> Type -> Int -> [String]
+inc op Type_int varAdr = ["iinc " ++ show varAdr ++ " " ++ incDecInt op]
+inc op Type_double varAdr = reverse [
+  "dload " ++ show varAdr,
+  "ldc2_w " ++ incDecInt op ++ ".0", 
+  "dadd",
+  "dstore " ++ show varAdr
+  ]
+
 mul :: Type -> MulOp -> String
 mul t OTimes = typeChar t ++ "mul"
 mul t ODiv = typeChar t ++ "div"
@@ -241,12 +278,13 @@ add :: Type -> AddOp -> String
 add t OPlus = typeChar t ++ "add"
 add t OMinus = typeChar t ++ "sub"
 
-cmpChar :: Type -> String
-cmpChar Type_int = "l"
-cmpChar Type_double = "d"
+cmp :: Type -> String
+cmp Type_int = "lcmp"
+cmp Type_bool = "lcmp"
+cmp Type_double = "dcmpg"
 
 store :: Type -> Int -> String
-store typ adr = typeChar typ ++ "store_" ++ show adr
+store typ adr = typeChar typ ++ "store " ++ show adr
 
 ret :: Type -> String
 ret typ = typeChar typ ++ "return"
