@@ -86,18 +86,21 @@ function :: Env -> A.Def -> (String, Env)
 function env@(funs, _, _, jmpC) (A.DFun typ id args stms) = (unlines $ concat
   [ [".method public static " ++ getSignature "" (A.DFun typ id args stms)],
     [".limit locals " ++ show newVarC],
-    [".limit stack " ++ "200"],
+    [".limit stack " ++ "100"],
     reverse $ map indent code, 
     [return],
     [".end method"]
   ], newEnv)
   where 
-    (code, newEnv@(_, _, newVarC, _)) = foldl statement ([""], (funs, vars, varC, jmpC)) stms
+    (code, newEnv@(_, _, newVarC, _)) = foldl statement ([""], (funs, argVars args 0, varC, jmpC)) stms
     varC = sum $ map (size . getArgType) args
-    vars = zip (map getArgId args) [0..]
     return = case typ of
       Type_void -> "return"
       _ -> ""
+
+argVars :: [Arg] -> Int -> [(Id, Int)]
+argVars [] _ = [] 
+argVars (a:as) n = (getArgId a, n):argVars as (n + size (getArgType a))
 
 size :: Type -> Int
 size Type_double = 2
@@ -108,7 +111,7 @@ size Type_void = 0
 statement :: ([String], Env) -> A.Stm -> ([String], Env)
 statement (code, env@(funs, vars, varC, jmpC)) stmt = 
   case stmt of 
-  (A.SExp exp@(_, typ)) -> case typ of
+  (A.SExp exp@(_, _) typ) -> case typ of
     Type_void -> (newCode, expEnv)
     Type_double -> ("pop2": newCode, expEnv)
     _ -> ("pop": newCode, expEnv)
@@ -174,7 +177,7 @@ expression (code, env@(funs, vars, _, _)) exp =
     (A.EInt 3, _) -> ("iconst_3":code, env)
     (A.EInt 4, _) -> ("iconst_4":code, env)
     (A.EInt 5, _) -> ("iconst_5":code, env)
-    (A.EInt i, _) -> (("sipush " ++ show i):code, env)
+    (A.EInt i, _) -> (("ldc_w " ++ show i):code, env)
     (A.EDouble 0.0, _) -> ("dconst_0":code, env)
     (A.EDouble 1.0, _) -> ("dconst_1":code, env)
     (A.EDouble d, _) -> (("ldc2_w " ++ show d):code, env)

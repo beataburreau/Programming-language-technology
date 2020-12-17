@@ -21,7 +21,7 @@ data Def = DFun A.Type A.Id [A.Arg] [Stm]
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 data Stm
-    = SExp Exp
+    = SExp Exp A.Type
     | SDecls A.Type [A.Id]
     | SInit A.Type A.Id Exp
     | SReturn Exp

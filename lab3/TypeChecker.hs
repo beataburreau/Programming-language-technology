@@ -57,8 +57,8 @@ checkStms fType = foldM (checkStm fType)
 checkStm :: Type -> (Env, [A.Stm]) -> Stm -> Err (Env, [A.Stm])
 checkStm fType (env, aStms) stm = case stm of
   SExp exp -> do 
-    (_, e) <- inferExp env exp 
-    return (env, aStms ++ [A.SExp e])
+    (typ, e) <- inferExp env exp 
+    return (env, aStms ++ [A.SExp e typ])
   SDecls _ [] -> Ok (env, aStms)
   SDecls varType (id:ids) -> do 
     newEnv <- updateVar env id varType
@@ -78,7 +78,7 @@ checkStm fType (env, aStms) stm = case stm of
       then 
         Bad "Condition in while statement must be Bool"
       else do   
-        (_, stms) <- checkStm fType (env, []) block
+        (_, stms) <- checkStm fType (newBlock env, []) block
         Ok (env, aStms ++ [A.SWhile e (head stms)])
   SBlock stms -> case checkStms fType (newBlock env, []) stms of
     Ok (_, blockStms) -> return (env, aStms ++ [A.SBlock blockStms])
@@ -99,6 +99,17 @@ convertExpression :: Type -> Type -> A.Exp -> Err A.Exp
 convertExpression Type_double Type_int exp = Ok (double exp)
 convertExpression expected actual exp | expected == actual = Ok exp
 convertExpression expected actual exp = Bad ("Incompatible types " ++ show expected ++ ", " ++ show actual ++ ": " ++ show exp)
+
+convertArgs :: [Type] -> [(Type, A.Exp)] -> Err [(Type, A.Exp)]
+convertArgs [] [] = Ok []
+convertArgs (_:_) [] = Bad "Incorrect number of function arguments"
+convertArgs [] (_:_) = Bad "Incorrect number of function arguments"
+convertArgs (eType:eTypes) ((aType, exp):args) = do
+  rest <- convertArgs eTypes args
+  case (eType, aType) of
+    (Type_double, Type_int) -> Ok ((Type_double, double exp):rest)
+    (expected, actual) | expected == actual -> Ok ((eType, exp): rest)
+    _ -> Bad ("Incompatible argument types " ++ show eType ++ ", " ++ show aType ++ ": " ++ show exp)
 
 double :: A.Exp -> A.Exp
 double aExp = (A.EApp (Id "double") [aExp], Type_double)
@@ -197,18 +208,12 @@ inferExp env x = case x of
       expectedType <- lookupVar env id
       (actualType, newExp) <- inferExp env exp
       cExp <- convertExpression expectedType actualType newExp
-      Ok (actualType, (A.EAss id cExp, actualType))
+      Ok (expectedType, (A.EAss id cExp, expectedType))
     EApp id args -> do 
         (argTypes, returnType) <- lookupFun env id
         aArgs <- mapRight (inferExp env) args
-        if length argTypes /= length args 
-          then Bad "Incorrect number of function arguments"
-          else
-            if all contains (zip (map fst aArgs) (map smallerTypes argTypes))
-              then
-                Ok (returnType, (A.EApp id (map snd aArgs), Type_void))
-              else
-                Bad ("wrong type of function. Expected " ++ show argTypes ++ " but got " ++ show (map fst aArgs))
+        cArgs <- convertArgs argTypes aArgs
+        Ok (returnType, (A.EApp id (map snd cArgs), returnType))
 
 contains :: (Type, [Type]) -> Bool
 contains (a, b) = elem a b
@@ -237,7 +242,7 @@ inferNumeric env exp1 exp2 = do
       (Type_bool, Type_bool) -> Bad "Incompatible types"  
       (a, b) | a == b -> Ok (typ1, (e1, opTyp1), (e2, opTyp2))
       (Type_double, Type_int) -> Ok (typ1, (e1, opTyp1), double (e2, opTyp2))
-      (Type_int, Type_double) -> Ok (typ1, double (e1, opTyp1), (e2, opTyp2))
+      (Type_int, Type_double) -> Ok (typ2, double (e1, opTyp1), (e2, opTyp2))
       _ -> Bad "Incompatible types"
 
 inferBool :: Env -> Exp -> Exp -> Err (Type, A.Exp, A.Exp) 
