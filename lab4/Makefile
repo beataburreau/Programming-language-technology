@@ -6,6 +6,12 @@
 # Files of solution.  Add more files as needed.  'lab4.hs'  has to be first!
 files=lab4.hs Fun.cf Makefile Interpreter.hs
 
+# Windows and UNIX compability
+ifeq ($(OS),Windows_NT)
+    dotslash := 
+else
+    dotslash := ./
+endif
 ###########################################################################
 
 # List of goals not corresponding to file names.
@@ -19,7 +25,7 @@ lab4 : $(files) Fun/Test
 
 test : lab4
 	$(MAKE) -C test
-	cd test && ./progs-test-lab4 ../.
+	cd test && $(dotslash)progs-test-lab4 ../.
 
 # Rules to build the parser:
 

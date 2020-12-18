@@ -6,8 +6,9 @@
 
 module Interpreter where
 
-import Control.Applicative (Applicative(..), Alternative(..))
-import Control.Monad       (MonadPlus(..), liftM)
+import Control.Applicative
+import Control.Monad.Except
+import Control.Monad.Reader
 
 import Data.Functor
 import Data.Map (Map)
@@ -18,32 +19,7 @@ import Debug.Trace
 import Fun.Abs
 import Fun.Print
 
---type Err = Except String
-
-data Err a = Ok a | Bad String
-  deriving (Read, Show, Eq, Ord)
-
-instance Monad Err where
-  return      = Ok
-  Ok a  >>= f = f a
-  Bad s >>= _ = Bad s
-
-instance Applicative Err where
-  pure = Ok
-  (Bad s) <*> _ = Bad s
-  (Ok f) <*> o  = liftM f o
-
-instance Functor Err where
-  fmap = liftM
-
-instance MonadPlus Err where
-  mzero = Bad "Err.mzero"
-  mplus (Bad _) y = y
-  mplus x       _ = x
-
-instance Alternative Err where
-  empty = mzero
-  (<|>) = mplus
+type Err = Except String
 
 -- | Evaluation strategy.
 
@@ -104,13 +80,13 @@ type Entry = Value
 
 intValue :: Value -> Err Integer
 intValue = \case
-  VInt i  -> Ok i
-  VClos{} -> Bad "Integer value expected, but got function value"
+  VInt i  -> return i
+  VClos{} -> throwError "Integer value expected, but got function value"
 
 apply :: Cxt -> Value -> Value -> Err Value
 apply cxt f v =
   case f of
-    VInt{} -> Bad "Integer value cannot be applied, expected function value"
+    VInt{} -> throwError "Integer value cannot be applied, expected function value"
     VClos x e env -> eval cxt{ cxtEnv = Map.insert x v env } e
 
 ---------------------------------------------------------------------------
@@ -121,17 +97,17 @@ apply cxt f v =
 eval :: Cxt -> Exp -> Err Value
 eval cxt = \case
 
-  EInt i    -> Ok $ VInt i
+  EInt i    -> return $ VInt i
 
   EVar x    -> do
     case Map.lookup x $ cxtEnv cxt of
-      Just v  -> Ok v
+      Just v  -> return v
       Nothing -> case Map.lookup x $ cxtSig cxt of
         Just e  -> eval cxt{ cxtEnv = Map.empty } e
-        Nothing -> Bad $ unwords [ "unbound variable", printTree x ]
+        Nothing -> throwError $ unwords [ "unbound variable", printTree x ]
 
 
-  EAbs x e  -> Ok $ VClos x e (cxtEnv cxt)
+  EAbs x e  -> return $ VClos x e (cxtEnv cxt)
 
   EApp f a | CallByValue <- cxtStrategy cxt -> do
     g <- eval cxt f
