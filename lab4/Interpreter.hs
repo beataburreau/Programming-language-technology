@@ -71,6 +71,15 @@ data Value
   | VClos Ident Exp Env      -- ^ Function: lambda-closure ⟨λx→e;γ⟩
                              --   FV(e) ⊆ {x} ∪ dom(γ)
 
+instance Num Value where
+  (VInt a) + (VInt b) = VInt (a+b)
+  (VInt a) - (VInt b) = VInt (a-b)
+  fromInteger i = VInt i
+instance Eq Value where
+  (VInt a) == (VInt b) = a == b
+instance Ord Value where
+  compare (VInt a) (VInt b) = compare a b
+
 -- | Signature.
 type Sig = Map Ident Exp
 
@@ -97,8 +106,6 @@ apply cxt f v =
 eval :: Cxt -> Exp -> Err Value
 eval cxt = \case
 
-  EInt i    -> return $ VInt i
-
   EVar x    -> do
     case Map.lookup x $ cxtEnv cxt of
       Just v  -> return v
@@ -106,18 +113,47 @@ eval cxt = \case
         Just e  -> eval cxt{ cxtEnv = Map.empty } e
         Nothing -> throwError $ unwords [ "unbound variable", printTree x ]
 
+  EInt i    -> return $ VInt i
 
-  EAbs x e  -> return $ VClos x e (cxtEnv cxt)
+  EApp f a | CallByName <- cxtStrategy cxt -> do
+    g <- eval cxt f
+    let v = VClos (closVar g) a $ cxtEnv cxt
+    apply cxt g v
 
   EApp f a | CallByValue <- cxtStrategy cxt -> do
     g <- eval cxt f
     v <- eval cxt a
     apply cxt g v
 
-  EAdd e e' -> todo "EAdd"
+  EAdd e e' -> do
+    v <- eval cxt e
+    v' <- eval cxt e'
+    return (v + v')
 
-  ESub e e' -> todo "ESub"
+  ESub e e' -> do
+    v <- eval cxt e
+    v' <- eval cxt e'
+    return (v - v')
 
-  ELt  e e' -> todo "ELt"
+  ELt e e' -> do
+    v <- eval cxt e
+    v' <- eval cxt e'
+    if v < v'
+      then
+        return 0
+      else
+        return 1
 
-  EIf c t e -> todo "EIf"
+  EIf c t e -> do
+    c' <- eval cxt c
+    if c' == 1
+      then
+        eval cxt t
+      else
+        eval cxt e
+
+  EAbs x e  -> return $ VClos x e (cxtEnv cxt)
+
+
+closVar :: Value -> Ident
+closVar (VClos i _ _) = i
