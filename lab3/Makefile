@@ -7,6 +7,12 @@
 files=lab3.hs jasmin.jar Runtime.java Makefile CMM.cf \
   Annotated.hs TypeChecker.hs Compiler.hs
 
+# Windows and UNIX compability
+ifeq ($(OS),Windows_NT)
+    dotslash := 
+else
+    dotslash := ./
+endif
 ###########################################################################
 
 # List of goals not corresponding to file names.
@@ -17,9 +23,11 @@ default : lab3
 
 build : lab3 Runtime.class
 
-test : build
+test/progs-test-lab3 :
 	$(MAKE) -C test
-	test/progs-test-lab3 .
+
+test : build test/progs-test-lab3
+	cd test && $(dotslash)progs-test-lab3 ../.
 
 # The extra dependency CMM/Test ensures that the parser is built from CMM.cf
 lab3 : $(files) CMM/Test

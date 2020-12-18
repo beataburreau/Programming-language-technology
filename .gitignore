@@ -3,7 +3,8 @@ CMM
 *.hi
 *.o
 *.exe
-*.progs-test-lab2
+progs-test-lab*
+Fun
 lab2/lab2
 lab2/CMM/*
 *.j
