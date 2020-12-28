@@ -110,14 +110,17 @@ eval cxt = \case
     case Map.lookup x $ cxtEnv cxt of
       Just v  -> return v
       Nothing -> case Map.lookup x $ cxtSig cxt of
-        Just e  -> eval cxt{ cxtEnv = Map.empty } e
+        Just e | CallByName <- cxtStrategy cxt -> return (VClos x e $ cxtEnv cxt)
+        Just e | CallByValue <- cxtStrategy cxt -> eval cxt{ cxtEnv = Map.empty } e
         Nothing -> throwError $ unwords [ "unbound variable", printTree x ]
 
   EInt i    -> return $ VInt i
 
   EApp f a | CallByName <- cxtStrategy cxt -> do
     g <- eval cxt f
-    let v = VClos (closVar g) a $ cxtEnv cxt
+    v <- case a of
+        (EInt i) -> return (VInt i)
+        _ -> return (VClos (closVar g) a $ cxtEnv cxt)
     apply cxt g v
 
   EApp f a | CallByValue <- cxtStrategy cxt -> do
@@ -126,18 +129,18 @@ eval cxt = \case
     apply cxt g v
 
   EAdd e e' -> do
-    v <- eval cxt e
-    v' <- eval cxt e'
+    v <- evalInt cxt e
+    v' <- evalInt cxt e'
     return (v + v')
 
   ESub e e' -> do
-    v <- eval cxt e
-    v' <- eval cxt e'
+    v <- evalInt cxt e
+    v' <- evalInt cxt e'
     return (v - v')
 
   ELt e e' -> do
-    v <- eval cxt e
-    v' <- eval cxt e'
+    v <- evalInt cxt e
+    v' <- evalInt cxt e'
     if v < v'
       then
         return 0
@@ -145,7 +148,7 @@ eval cxt = \case
         return 1
 
   EIf c t e -> do
-    c' <- eval cxt c
+    c' <- evalInt cxt c
     if c' == 1
       then
         eval cxt t
@@ -154,6 +157,12 @@ eval cxt = \case
 
   EAbs x e  -> return $ VClos x e (cxtEnv cxt)
 
+evalInt :: Cxt -> Exp -> Err Value
+evalInt cxt e = do
+  i <- eval cxt e
+  case i of
+    (VInt i) -> return (VInt i)
+    _ -> throwError "Expected integer"
 
 closVar :: Value -> Ident
 closVar (VClos i _ _) = i
