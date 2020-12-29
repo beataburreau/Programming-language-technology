@@ -71,6 +71,13 @@ data Value
   | VClos Ident Exp Env      -- ^ Function: lambda-closure ⟨λx→e;γ⟩
                              --   FV(e) ⊆ {x} ∪ dom(γ)
 
+instance Show Value where
+  show (VInt a) = "VInt " ++ show a
+  show (VClos i e env) = "VClos (" ++ show i ++ ") (" ++ show e ++ ") (" ++ show env ++ ")"
+
+
+-- fromList [(Ident "x",VClos (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))) (fromList []))] 
+-- fromList [(Ident "double",EAbs (Ident "x") (EAdd (EVar (Ident "x")) (EVar (Ident "x")))),(Ident "twice1",EAbs (Ident "f") (EAbs (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))))),(Ident "twice2",EAbs (Ident "f") (EAbs (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))))),(Ident "twice3",EAbs (Ident "f") (EAbs (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))))),(Ident "twice4",EAbs (Ident "f") (EAbs (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))))),(Ident "twice5",EAbs (Ident "f") (EAbs (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))))),(Ident "twice6",EAbs (Ident "f") (EAbs (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))))),(Ident "twice7",EAbs (Ident "f") (EAbs (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))))),(Ident "twice8",EAbs (Ident "f") (EAbs (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x"))))))] 
 instance Num Value where
   (VInt a) + (VInt b) = VInt (a+b)
   (VInt a) - (VInt b) = VInt (a-b)
@@ -108,12 +115,13 @@ eval cxt = \case
 
   EVar x    -> do
     case Map.lookup x $ cxtEnv cxt of
+      Just v | CallByValue <- cxtStrategy cxt -> return v
       Just (VClos i e env) -> eval cxt{ cxtEnv = env } e
       Just v -> return v
       Nothing -> case Map.lookup x $ cxtSig cxt of
         Just e -> eval cxt{ cxtEnv = Map.empty } e
-        Nothing -> throwError $ unwords [ "unbound variable", printTree x ]
-
+        Nothing -> throwError $ unwords [ "unbound variable", printTree x, show $ cxtEnv cxt, show $ cxtSig cxt ]
+-- [(Ident "x", VClos (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))) (fromList []))]
   EInt i    -> return $ VInt i
 
   EApp f a | CallByName <- cxtStrategy cxt -> do
