@@ -246,7 +246,7 @@ runGood lab4 good = do
   echo $ "Expecting: " <> expect
   (exitval,stripEnd -> result,_) <- procStrictWithErr lab4 [mode, file] empty
   goodpass <- if (exitval /= ExitSuccess) then do
-                  echo $ color red "Error"
+                  echo $ color red "Output: " ++ color red result ++ "\nError"
                   return 0
               else
                   if (result == expect) then do
