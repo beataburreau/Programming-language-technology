@@ -108,19 +108,17 @@ eval cxt = \case
 
   EVar x    -> do
     case Map.lookup x $ cxtEnv cxt of
-      Just v  -> return v
+      Just (VClos i e env) -> eval cxt{ cxtEnv = env } e
+      Just v -> return v
       Nothing -> case Map.lookup x $ cxtSig cxt of
-        Just e | CallByName <- cxtStrategy cxt -> return (VClos x e $ cxtEnv cxt)
-        Just e | CallByValue <- cxtStrategy cxt -> eval cxt{ cxtEnv = Map.empty } e
+        Just e -> eval cxt{ cxtEnv = Map.empty } e
         Nothing -> throwError $ unwords [ "unbound variable", printTree x ]
 
   EInt i    -> return $ VInt i
 
   EApp f a | CallByName <- cxtStrategy cxt -> do
     g <- eval cxt f
-    v <- case a of
-        (EInt i) -> return (VInt i)
-        _ -> return (VClos (closVar g) a $ cxtEnv cxt)
+    let v = VClos (closVar g) a $ cxtEnv cxt
     apply cxt g v
 
   EApp f a | CallByValue <- cxtStrategy cxt -> do
@@ -143,9 +141,9 @@ eval cxt = \case
     v' <- evalInt cxt e'
     if v < v'
       then
-        return 0
-      else
         return 1
+      else
+        return 0
 
   EIf c t e -> do
     c' <- evalInt cxt c
