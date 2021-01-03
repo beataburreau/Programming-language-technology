@@ -33,9 +33,7 @@ interpret :: Strategy -> Program -> Err Integer
 interpret strategy (Prog defs (DMain mainExp)) = do
 
   -- Create initial environment
-  -- mkLam [x1,...,xn] e = EAbs x1 $ ... $ EAbs xn e
-  -- mkLam [x1,...,xn] e = x1 `EAbs` ... xn `EAbs` e
-  -- EAbs :: Ident -> Exp -> Exp
+  
   let mkLam xs e = foldr EAbs e xs
   let mkDef (DDef f xs e) = (f, mkLam xs e)
   let sig = Map.fromList $ map mkDef defs
@@ -75,9 +73,6 @@ instance Show Value where
   show (VInt a) = "VInt " ++ show a
   show (VClos i e env) = "VClos (" ++ show i ++ ") (" ++ show e ++ ") (" ++ show env ++ ")"
 
-
--- fromList [(Ident "x",VClos (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))) (fromList []))] 
--- fromList [(Ident "double",EAbs (Ident "x") (EAdd (EVar (Ident "x")) (EVar (Ident "x")))),(Ident "twice1",EAbs (Ident "f") (EAbs (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))))),(Ident "twice2",EAbs (Ident "f") (EAbs (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))))),(Ident "twice3",EAbs (Ident "f") (EAbs (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))))),(Ident "twice4",EAbs (Ident "f") (EAbs (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))))),(Ident "twice5",EAbs (Ident "f") (EAbs (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))))),(Ident "twice6",EAbs (Ident "f") (EAbs (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))))),(Ident "twice7",EAbs (Ident "f") (EAbs (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))))),(Ident "twice8",EAbs (Ident "f") (EAbs (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x"))))))] 
 instance Num Value where
   (VInt a) + (VInt b) = VInt (a+b)
   (VInt a) - (VInt b) = VInt (a-b)
@@ -121,7 +116,6 @@ eval cxt = \case
       Nothing -> case Map.lookup x $ cxtSig cxt of
         Just e -> eval cxt{ cxtEnv = Map.empty } e
         Nothing -> throwError $ unwords [ "unbound variable", printTree x, show $ cxtEnv cxt, show $ cxtSig cxt ]
--- [(Ident "x", VClos (Ident "x") (EApp (EVar (Ident "f")) (EApp (EVar (Ident "f")) (EVar (Ident "x")))) (fromList []))]
   EInt i    -> return $ VInt i
 
   EApp f a | CallByName <- cxtStrategy cxt -> do
