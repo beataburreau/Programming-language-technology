@@ -1,0 +1,114 @@
+-- Program
+entrypoints Program ;
+PDefs. Program ::= [Def] ; 
+terminator Def "" ;
+
+-- Comments
+comment "//" ;
+comment "#" ;
+comment "/*" "*/" ;
+
+-- Identifiers 
+token Id (letter (letter | digit | '_')*) ;
+
+-- Function
+DFunc. Def ::= Type Id "(" [Arg] ")" Body ;
+separator Arg "," ; 
+DTDef. Def ::= "typedef" Type Id ";";
+DConst. Def ::= "using" Const ";" ;
+DVDecl. Def ::= Decl ;
+FBody. Body ::= "{" [Stm] "}";
+EBody. Body ::= ";" ;
+terminator Stm "" ;
+
+-- Types
+TInt. Type ::= "int" ;
+TBool. Type ::= "bool" ;
+TChar. Type ::= "char" ;
+TDouble. Type ::= "double" ;
+TVoid. Type ::= "void" ;
+TConst. Type ::= Const ;
+TRef. Type ::= Type "& " ; 
+
+-- Qualified constants
+EConst. Exp15 ::= Const ;
+QConst. Const ::= [Id];
+separator nonempty Id "::" ; 
+
+-- Arguments
+ADecl. Arg ::= Type ;
+AVarDecl. Arg ::= Type Var ;
+ASDecl. Arg ::= "const" Type ;
+ASVarDecl. Arg ::= "const" Type Var ;
+VDecl. Var ::= Id ;
+VInit. Var ::= Id "=" Exp ;
+
+-- Statements
+SExp. Stm ::= Exp ";" ;
+SDecl. Stm ::= Decl ;
+DDecl. Decl ::= Type [Var] ";" ;
+DSDecl. Decl ::= "const" Type [Var] ";" ;
+separator nonempty Var "," ;
+SRet. Stm ::= "return" Exp ";" ;
+SWhile. Stm ::= "while" "(" Exp ")" Stm ;
+SDo. Stm ::= "do" Stm "while" "(" Exp ")" ";" ; 
+SFor. Stm ::= "for" "(" Decl Exp ";" Exp ")" Stm ; 
+SIf. Stm ::= "if" "(" Exp ")" Stm ;
+SIfElse. Stm ::= "if" "(" Exp ")" Stm "else" Stm;
+SBlock. Stm ::= "{" [Stm] "}" ;
+STDef. Stm ::= "typedef" Type Id ";";
+
+-- Expressions
+EInt. Exp15 ::= Integer ;
+EDouble. Exp15 ::= Double ;
+EChar. Exp15 ::= Char ;
+EString. Exp15 ::= [String] ;
+separator nonempty String "";
+
+EIndex. Exp14 ::= Exp14 "[" Exp "]" ;
+
+EFuncCall. Exp14 ::= Exp14 "(" [Exp] ")" ;
+separator Exp "," ;
+
+EDotOp. Exp14 ::= Exp14 "." Exp15 ;
+EArrowOp. Exp14 ::= Exp14 "->" Exp15 ;
+
+ERIncr. Exp14 ::= Exp14 "++" ;
+ERDecr. Exp14 ::= Exp14 "--" ;
+
+ELIncr. Exp13 ::= "++" Exp13 ; 
+ELDecr. Exp13 ::= "--" Exp13 ; 
+EDeref. Exp13 ::= "*" Exp13 ;
+ENeg. Exp13 ::=  "!" Exp13 ;
+
+EMul. Exp12 ::= Exp12 "*" Exp13 ;
+EDiv. Exp12 ::= Exp12 "/" Exp13 ;
+ERem. Exp12 ::= Exp12 "%" Exp13 ;
+
+EAdd. Exp11 ::= Exp11 "+" Exp12 ;
+ESub. Exp11 ::= Exp11 "-" Exp12 ;
+
+ELShift. Exp10 ::= Exp10 "<<" Exp11 ;
+ERShift. Exp10 ::= Exp10 ">>" Exp11 ;
+
+ELess. Exp9 ::= Exp9 "<" Exp10 ;
+EGreat. Exp9 ::= Exp9 ">" Exp10 ; 
+ELEq. Exp9 ::= Exp9 "<=" Exp10 ;
+EGEq. Exp9 ::= Exp9 ">=" Exp10 ;
+
+EEq. Exp8 ::= Exp8 "==" Exp9 ;
+EInEq. Exp8 ::= Exp8 "!=" Exp9 ;
+
+EConj. Exp4 ::= Exp4 "&&" Exp5 ;
+
+EDisj. Exp3 ::= Exp3 "||" Exp4 ; 
+
+EAss. Exp2 ::= Exp3 "=" Exp2 ;
+EIncrease. Exp2 ::= Exp3 "+=" Exp2 ;
+EDecrease. Exp2 ::= Exp3 "-=" Exp2 ;
+
+ECond. Exp2 ::= Exp3 "?" Exp3 ":" Exp2 ;
+
+EException. Exp1 ::= "throw" Exp1 ;
+
+coercions Exp 15 ;
